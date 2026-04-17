@@ -1,0 +1,37 @@
+# livemd — standard tier (16 GB M-series).
+# Copy to ~/.config/livemd/livemd.toml (the setup.sh script does this for you).
+
+# --- ASR (Whisper small) ---
+model_path = "models/ggml-small.bin"
+
+output_path = "transcript.md"
+
+# "en" | "ja" | "auto". Default is "en". Press `l` in TUI to cycle.
+language = "en"
+
+# "default" or a specific device name from `cpal` enumeration.
+input_device = "default"
+
+# Whisper decoding threads.
+threads = 4
+
+[vad]
+aggressiveness = 2
+min_speech_ms = 500
+silence_ms = 900
+max_segment_ms = 15000
+
+# --- Translator (Qwen2.5-7B via llama-server) ---
+[translator]
+binary = "llama-server"
+model_path = "models/Qwen2.5-7B-Instruct-Q4_K_M.gguf"
+port = 8787
+n_ctx = 4096
+max_new_tokens = 512
+startup_timeout_secs = 120
+
+# --- Diarizer (sherpa-onnx ERes2Net) ---
+[diarizer]
+model_path = "models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
+threshold = 0.5
+min_samples = 16000

@@ -11,85 +11,52 @@ Live bilingual voice transcription TUI in Rust.
 ## Requirements
 
 - Rust (stable, 2021 edition)
-- CMake + a C/C++ toolchain (needed to build whisper.cpp and llama.cpp)
-- Apple Silicon (for Metal) recommended but not required
-- ~8 GB free disk for the two models
+- CMake + a C/C++ toolchain (needed to build whisper.cpp and sherpa-onnx)
+- `llama-server` on PATH → `brew install llama.cpp`
+- Apple Silicon (for Metal) recommended
 
-### 1. Whisper model
+## Model tiers
 
-```sh
-mkdir -p models
-curl -L -o models/ggml-large-v3-turbo.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
-```
+Pick the tier that matches your machine.
 
-`large-v3-turbo` (~1.6 GB) is the recommended default — near-`large-v3`
-quality with `small`-like speed on M-series Metal. `small` (~500 MB) is a
-lighter fallback; `large-v3` (~3 GB) is the highest quality but slower.
+| Tier | Whisper | Translator | Diarizer | Disk | RAM |
+|------|---------|------------|----------|------|-----|
+| **standard** | `small` (500 MB) | Qwen2.5-7B Q4_K_M (4.5 GB) | 3dspeaker ERes2Net (40 MB) | ~5 GB | ~7 GB |
+| **high** | `large-v3-turbo` (1.6 GB) | Qwen2.5-14B Q4_K_M (8.5 GB) | 3dspeaker ERes2Net (40 MB) | ~10 GB | ~11 GB |
 
-### 2. llama-server + translator model (optional)
+- **standard** is comfortable on any 16 GB M-series Mac.
+- **high** shines on 32 GB Macs and produces noticeably better JA ↔ EN translation
+  and ASR accuracy.
 
-`livemd` drives `llama.cpp`'s `llama-server` as a subprocess to avoid linking
-conflicts between whisper.cpp and llama.cpp in the same binary.
+## Install
 
-```sh
-brew install llama.cpp   # provides `llama-server` on PATH
-```
-
-Then download the Qwen model (bartowski's single-file build, no auth required):
+One command does everything (binary install + model downloads + config):
 
 ```sh
-curl -L -o models/Qwen2.5-14B-Instruct-Q4_K_M.gguf \
-  https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf
+./setup.sh standard   # 16 GB Macs
+# or
+./setup.sh high       # 32 GB+ Macs
 ```
 
-Size: ~8.5 GB. Peak RAM during inference: ~9 GB. 14B noticeably outperforms
-7B on JA↔EN conversational translation on a 32 GB M-series machine. For
-lighter setups use `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (~4.5 GB).
+The script is idempotent — already-present models are skipped, so re-running
+is safe. It installs `livemd` into `~/.cargo/bin/`, drops models into
+`~/.config/livemd/models/`, and writes `~/.config/livemd/livemd.toml` from
+the matching example. To switch tiers later, just re-run with the other
+argument (models for the other tier will be added alongside; edit the
+config by hand if you want to free disk).
 
-`livemd` will spawn `llama-server --model ... --port 8787 --n-gpu-layers 999`
-on start and kill it on exit. Server logs go to `llama-server.log`.
+### Manual setup
 
-To run without translation, delete or comment out the `[translator]` section in `livemd.toml`.
+If you prefer to drive it yourself, `livemd.toml.standard.example` and
+`livemd.toml.high.example` list the exact model paths expected. Download
+the corresponding models into `~/.config/livemd/models/` and copy the
+example to `~/.config/livemd/livemd.toml`. Relative paths in the config
+resolve against the config file's directory, so `models/foo` means
+`~/.config/livemd/models/foo`.
 
-### 3. Diarizer model (optional)
-
-```sh
-curl -L -o models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx \
-  https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
-```
-
-Size: ~40 MB. Embedding dim: 512. Language-agnostic (trained on zh but
-generalises well to JA/EN voices). Runs on CPU only but is very fast on
-M-series (~tens of ms per segment).
-
-Tune `threshold` in `[diarizer]` (0.45–0.55 typical for mixed JA/EN) if
-speakers are being merged or split.
-
-To run without diarization, delete or comment out the `[diarizer]` section.
-
-## Install globally
-
-```sh
-cargo install --path .
-# -> installs `livemd` into ~/.cargo/bin/
-```
-
-Create the global config directory and drop models into it:
-
-```sh
-mkdir -p ~/.config/livemd/models
-cp livemd.toml.example ~/.config/livemd/livemd.toml
-
-# move (or re-download) models into the config dir
-mv models/ggml-small.bin ~/.config/livemd/models/
-mv models/Qwen2.5-7B-Instruct-Q4_K_M.gguf ~/.config/livemd/models/
-```
-
-Edit `~/.config/livemd/livemd.toml` — the default relative paths (`models/...`)
-resolve against the config file's directory, so once models are in
-`~/.config/livemd/models/` the sample config works unchanged. You can also use
-absolute paths or `~/` in any path field.
+To disable translation or diarization, delete or comment out the
+`[translator]` or `[diarizer]` sections. The transcript-only path keeps
+working.
 
 ## Run
 
