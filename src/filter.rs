@@ -84,6 +84,7 @@ pub fn clean(text: &str) -> Option<String> {
         let before = s.clone();
         s = strip_trailing_stray_you(&s);
         s = strip_trailing_hallucinations(&s);
+        s = strip_trailing_word_repetition(&s);
         if s == before {
             break;
         }
@@ -103,7 +104,7 @@ pub fn clean(text: &str) -> Option<String> {
         }
     }
 
-    if is_repetition_loop(&s) {
+    if is_repetition_loop(&s) || is_word_repetition_loop(&s) {
         return None;
     }
 
@@ -174,6 +175,49 @@ fn is_repetition_loop(s: &str) -> bool {
     }
     let max_count = counts.values().copied().max().unwrap_or(0);
     max_count * 100 / chars.len() >= 70
+}
+
+/// Detects word-level / token-level loops like "Great. Great. Great." or
+/// "the the the". Returns true if a single whitespace-delimited token
+/// accounts for at least 60% of a string of 20+ words.
+fn is_word_repetition_loop(s: &str) -> bool {
+    let words: Vec<&str> = s.split_whitespace().collect();
+    if words.len() < 20 {
+        return false;
+    }
+    let mut counts = std::collections::HashMap::new();
+    for w in &words {
+        *counts.entry(*w).or_insert(0usize) += 1;
+    }
+    let max_count = counts.values().copied().max().unwrap_or(0);
+    max_count * 100 / words.len() >= 60
+}
+
+/// Strips trailing runs of an identical word (>=5 occurrences in a row).
+/// Matches Whisper's habit of appending "Great. Great. Great." tails.
+fn strip_trailing_word_repetition(s: &str) -> String {
+    let trimmed = s.trim_end();
+    let words: Vec<&str> = trimmed.split_whitespace().collect();
+    if words.len() < 6 {
+        return trimmed.to_string();
+    }
+    let last = words[words.len() - 1];
+    let mut run = 1usize;
+    for i in (0..words.len() - 1).rev() {
+        if words[i] == last {
+            run += 1;
+        } else {
+            break;
+        }
+    }
+    if run < 5 {
+        return trimmed.to_string();
+    }
+    let keep = words.len() - run;
+    if keep == 0 {
+        return String::new();
+    }
+    words[..keep].join(" ")
 }
 
 fn collapse_whitespace(s: &str) -> String {
@@ -299,6 +343,32 @@ mod tests {
         assert_eq!(
             clean("Oh, that looks great. Alright. you").as_deref(),
             Some("Oh, that looks great. Alright.")
+        );
+    }
+
+    #[test]
+    fn drops_word_repetition_loop() {
+        let runaway = "Great. ".repeat(100);
+        assert_eq!(clean(&runaway), None);
+    }
+
+    #[test]
+    fn strips_trailing_word_repetition_tail() {
+        let input = format!(
+            "Let me explain this properly. {}",
+            "Great. ".repeat(40)
+        );
+        assert_eq!(
+            clean(&input).as_deref(),
+            Some("Let me explain this properly.")
+        );
+    }
+
+    #[test]
+    fn keeps_short_natural_repetition() {
+        assert_eq!(
+            clean("no no no, that's not what I meant").as_deref(),
+            Some("no no no, that's not what I meant")
         );
     }
 }
