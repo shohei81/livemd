@@ -1,4 +1,5 @@
 use crate::audio::TARGET_SR;
+use crate::msg::DraftState;
 use crate::transcribe::Segment;
 use anyhow::Result;
 use chrono::{DateTime, Local};
@@ -33,6 +34,7 @@ impl VadRunner {
         audio_rx: Receiver<Vec<f32>>,
         seg_tx: Sender<Segment>,
         level_tx: Sender<f32>,
+        draft_tx: Sender<DraftState>,
         paused: Arc<AtomicBool>,
     ) -> Result<()> {
         let mode = match self.aggressiveness {
@@ -54,6 +56,9 @@ impl VadRunner {
         let mut segment_start: Option<DateTime<Local>> = None;
         let mut next_id: u64 = 0;
 
+        let mut frames_since_draft = 0usize;
+        let emit_draft_every: usize = 10; // ~300 ms at 30 ms/frame
+
         while let Ok(chunk) = audio_rx.recv() {
             if paused.load(Ordering::Relaxed) {
                 // Discard audio, reset segment state, flatten the UI gauge.
@@ -63,6 +68,7 @@ impl VadRunner {
                 speech_frames = 0;
                 silence_frames = 0;
                 let _ = level_tx.try_send(0.0);
+                let _ = draft_tx.try_send(DraftState::default());
                 continue;
             }
 
@@ -90,6 +96,22 @@ impl VadRunner {
                     silence_frames = 0;
                     speech_frames += 1;
                     segment.extend_from_slice(&frame_f);
+                    frames_since_draft += 1;
+                    if frames_since_draft >= emit_draft_every {
+                        let _ = draft_tx.try_send(DraftState {
+                            active: true,
+                            speech_ms: (speech_frames as u32) * FRAME_MS,
+                            elapsed_ms: segment_start
+                                .map(|s| {
+                                    Local::now()
+                                        .signed_duration_since(s)
+                                        .num_milliseconds()
+                                        .max(0) as u32
+                                })
+                                .unwrap_or(0),
+                        });
+                        frames_since_draft = 0;
+                    }
                 } else if in_speech {
                     silence_frames += 1;
                     segment.extend_from_slice(&frame_f);
@@ -120,6 +142,8 @@ impl VadRunner {
                         in_speech = false;
                         silence_frames = 0;
                         speech_frames = 0;
+                        frames_since_draft = 0;
+                        let _ = draft_tx.try_send(DraftState::default());
                     }
                 }
 
@@ -139,6 +163,8 @@ impl VadRunner {
                     in_speech = false;
                     silence_frames = 0;
                     speech_frames = 0;
+                    frames_since_draft = 0;
+                    let _ = draft_tx.try_send(DraftState::default());
                 }
             }
         }

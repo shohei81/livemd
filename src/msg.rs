@@ -14,6 +14,16 @@ pub enum TranslatorStatus {
     Failed,
 }
 
+/// Snapshot of VAD's in-progress segment, emitted a few times per second.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DraftState {
+    pub active: bool,
+    /// Cumulative milliseconds that registered as speech.
+    pub speech_ms: u32,
+    /// Wall-clock milliseconds since the segment started.
+    pub elapsed_ms: u32,
+}
+
 pub fn detect_lang(text: &str) -> &'static str {
     let has_cjk = text.chars().any(|c| {
         let n = c as u32;

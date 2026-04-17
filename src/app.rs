@@ -2,7 +2,7 @@ use crate::{
     audio::AudioCapture,
     config::Config,
     markdown,
-    msg::{TranslatorStatus, UiMsg},
+    msg::{DraftState, TranslatorStatus, UiMsg},
     transcribe::{Segment, TranscribeRunner, TranscriptLine},
     translate::{self, TranslatorConfig},
     ui::{draw, UiState},
@@ -33,6 +33,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
     let (line_tx, line_rx) = bounded::<TranscriptLine>(32);
     let (ui_tx, ui_rx) = unbounded::<UiMsg>();
     let (level_tx, level_rx) = bounded::<f32>(16);
+    let (draft_tx, draft_rx) = bounded::<DraftState>(8);
 
     let language = Arc::new(RwLock::new(cfg.language.clone()));
 
@@ -53,7 +54,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
             vad_cfg.silence_ms,
             vad_cfg.max_segment_ms,
         );
-        if let Err(e) = vad.run(audio_rx, seg_tx, level_tx, paused_vad) {
+        if let Err(e) = vad.run(audio_rx, seg_tx, level_tx, draft_tx, paused_vad) {
             tracing::error!("vad thread ended: {}", e);
         }
     });
@@ -139,6 +140,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         &model_name,
         ui_rx,
         level_rx,
+        draft_rx,
         translator_status_init,
         existing_content.as_deref(),
     );
@@ -157,6 +159,7 @@ fn run_loop(
     model_name: &str,
     ui_rx: Receiver<UiMsg>,
     level_rx: Receiver<f32>,
+    draft_rx: Receiver<DraftState>,
     initial_translator_status: TranslatorStatus,
     existing_content: Option<&str>,
 ) -> Result<()> {
@@ -167,6 +170,7 @@ fn run_loop(
     let mut translator_status = initial_translator_status;
     let mut input_name = capture.input_name.clone();
     let mut picker: Option<DevicePicker> = None;
+    let mut draft = DraftState::default();
 
     loop {
         while let Ok(msg) = ui_rx.try_recv() {
@@ -184,6 +188,9 @@ fn run_loop(
             level = l;
         }
         level_smooth = level_smooth * 0.7 + level * 0.3;
+        while let Ok(d) = draft_rx.try_recv() {
+            draft = d;
+        }
 
         let lang = language.read().map(|g| g.clone()).unwrap_or_default();
         let is_recording = !paused.load(Ordering::Relaxed);
@@ -200,6 +207,7 @@ fn run_loop(
                     saved_note: saved_note.as_deref(),
                     translator_status,
                     picker: picker.as_ref(),
+                    draft,
                 },
             );
         })?;
