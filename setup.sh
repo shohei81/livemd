@@ -35,11 +35,6 @@ fetch() {
 echo "==> Installing livemd binary"
 (cd "$SCRIPT_DIR" && cargo install --path .)
 
-echo "==> Fetching diarizer (40 MB)"
-fetch \
-  "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx" \
-  "$MODEL_DIR/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
-
 if [[ "$TIER" == "standard" ]]; then
     echo "==> Fetching Whisper small (500 MB)"
     fetch \

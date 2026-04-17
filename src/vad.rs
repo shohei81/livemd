@@ -29,7 +29,7 @@ impl VadRunner {
     pub fn run(
         &self,
         audio_rx: Receiver<Vec<f32>>,
-        seg_tx: Sender<std::sync::Arc<Segment>>,
+        seg_tx: Sender<Segment>,
         level_tx: Sender<f32>,
     ) -> Result<()> {
         let mode = match self.aggressiveness {
@@ -84,13 +84,13 @@ impl VadRunner {
                             let speech_ms = (speech_frames as u32) * FRAME_MS;
                             let id = next_id;
                             next_id += 1;
-                            let seg = std::sync::Arc::new(Segment {
+                            let seg = Segment {
                                 id,
                                 samples: std::mem::take(&mut segment),
                                 started_at: segment_start.unwrap_or_else(Local::now),
                                 ended_at: Local::now(),
                                 speech_ms,
-                            });
+                            };
                             info!(
                                 id,
                                 speech_frames,
@@ -113,13 +113,13 @@ impl VadRunner {
                     let speech_ms = (speech_frames as u32) * FRAME_MS;
                     let id = next_id;
                     next_id += 1;
-                    let seg = std::sync::Arc::new(Segment {
+                    let seg = Segment {
                         id,
                         samples: std::mem::take(&mut segment),
                         started_at: segment_start.unwrap_or_else(Local::now),
                         ended_at: Local::now(),
                         speech_ms,
-                    });
+                    };
                     info!(id, "max segment reached, force-flushing");
                     let _ = seg_tx.send(seg);
                     in_speech = false;

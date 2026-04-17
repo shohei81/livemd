@@ -1,7 +1,6 @@
 mod app;
 mod audio;
 mod config;
-mod diarize;
 mod filter;
 mod markdown;
 mod msg;

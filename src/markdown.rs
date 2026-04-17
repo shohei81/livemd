@@ -73,12 +73,11 @@ fn write_session(f: &mut std::fs::File, lines: &[TranscriptLine]) -> Result<()> 
         )?;
     }
     writeln!(f)?;
-    writeln!(f, "| time | speaker | English | 日本語 |")?;
-    writeln!(f, "|------|---------|---------|--------|")?;
+    writeln!(f, "| time | English | 日本語 |")?;
+    writeln!(f, "|------|---------|--------|")?;
 
     for line in lines {
         let ts = line.started_at.format("%H:%M:%S");
-        let speaker = line.speaker.as_deref().unwrap_or("");
         let (en, ja) = if line.src_lang == "ja" {
             (line.translated.as_deref().unwrap_or(""), line.text.as_str())
         } else {
@@ -86,9 +85,8 @@ fn write_session(f: &mut std::fs::File, lines: &[TranscriptLine]) -> Result<()> 
         };
         writeln!(
             f,
-            "| {} | {} | {} | {} |",
+            "| {} | {} | {} |",
             ts,
-            escape_cell(speaker),
             escape_cell(en),
             escape_cell(ja)
         )?;

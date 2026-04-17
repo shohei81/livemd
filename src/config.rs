@@ -17,30 +17,9 @@ pub struct Config {
     pub vad: VadConfig,
     #[serde(default)]
     pub translator: Option<TranslatorConfigToml>,
-    #[serde(default)]
-    pub diarizer: Option<DiarizerConfigToml>,
     /// Set at runtime by main.rs — not loaded from TOML.
     #[serde(default, skip)]
     pub log_dir: PathBuf,
-}
-
-#[derive(Debug, Deserialize, Clone)]
-pub struct DiarizerConfigToml {
-    pub model_path: PathBuf,
-    #[serde(default = "default_diarizer_threshold")]
-    pub threshold: f32,
-    #[serde(default)]
-    pub num_threads: Option<usize>,
-    #[serde(default = "default_diarizer_min_samples")]
-    pub min_samples: usize,
-}
-
-fn default_diarizer_threshold() -> f32 {
-    0.5
-}
-fn default_diarizer_min_samples() -> usize {
-    // ~0.5 seconds at 16 kHz — embeddings below this are unreliable.
-    8_000
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -148,9 +127,6 @@ impl Config {
             if t.binary.components().count() > 1 || t.binary.to_string_lossy().starts_with("~/") {
                 t.binary = resolve_path(&t.binary, &config_dir);
             }
-        }
-        if let Some(d) = cfg.diarizer.as_mut() {
-            d.model_path = resolve_path(&d.model_path, &config_dir);
         }
 
         tracing::info!(config = %path.display(), "config loaded");

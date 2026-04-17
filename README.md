@@ -3,15 +3,14 @@
 Live bilingual voice transcription TUI in Rust.
 
 - **ASR**: `cpal` → `webrtc-vad` → `whisper.cpp` (Metal) via `whisper-rs`
-- **Translation** (optional): Qwen2.5-7B-Instruct via `llama-server` subprocess (Metal), queried over HTTP
-- **Diarization** (optional): `sherpa-onnx` speaker-embedding ONNX model via `sherpa-rs` (CPU), online centroid clustering
-- **UI**: `ratatui` two-column display (English ↔ 日本語) with `Sn:` speaker prefix
+- **Translation** (optional): Qwen2.5 via `llama-server` subprocess (Metal), queried over HTTP
+- **UI**: `ratatui` two-column display (English ↔ 日本語)
 - **Output**: timestamped Markdown table
 
 ## Requirements
 
 - Rust (stable, 2021 edition)
-- CMake + a C/C++ toolchain (needed to build whisper.cpp and sherpa-onnx)
+- CMake + a C/C++ toolchain (needed to build whisper.cpp)
 - `llama-server` on PATH → `brew install llama.cpp`
 - Apple Silicon (for Metal) recommended
 
@@ -19,10 +18,10 @@ Live bilingual voice transcription TUI in Rust.
 
 Pick the tier that matches your machine.
 
-| Tier | Whisper | Translator | Diarizer | Disk | RAM |
-|------|---------|------------|----------|------|-----|
-| **standard** | `small` (500 MB) | Qwen2.5-7B Q4_K_M (4.5 GB) | 3dspeaker ERes2Net (40 MB) | ~5 GB | ~7 GB |
-| **high** | `large-v3-turbo` (1.6 GB) | Qwen2.5-14B Q4_K_M (8.5 GB) | 3dspeaker ERes2Net (40 MB) | ~10 GB | ~11 GB |
+| Tier | Whisper | Translator | Disk | RAM |
+|------|---------|------------|------|-----|
+| **standard** | `small` (500 MB) | Qwen2.5-7B Q4_K_M (4.5 GB) | ~5 GB | ~7 GB |
+| **high** | `large-v3-turbo` (1.6 GB) | Qwen2.5-14B Q4_K_M (8.5 GB) | ~10 GB | ~11 GB |
 
 - **standard** is comfortable on any 16 GB M-series Mac.
 - **high** shines on 32 GB Macs and produces noticeably better JA ↔ EN translation
@@ -54,9 +53,8 @@ example to `~/.config/livemd/livemd.toml`. Relative paths in the config
 resolve against the config file's directory, so `models/foo` means
 `~/.config/livemd/models/foo`.
 
-To disable translation or diarization, delete or comment out the
-`[translator]` or `[diarizer]` sections. The transcript-only path keeps
-working.
+To disable translation, delete or comment out the `[translator]` section.
+The transcript-only path keeps working.
 
 ## Run
 
@@ -126,16 +124,16 @@ cargo run --release -- notes.md
  q quit&save · s save · l cycle lang · space pause
 ```
 
-`▶` marks the source language (the side the speaker actually used).
+`▶` marks the source-language side (the one the speaker actually used).
 The opposite column shows the Qwen-translated version (or `…` while pending).
 
 ### Markdown output
 
 ```markdown
-| time | speaker | English | 日本語 |
-|------|---------|---------|--------|
-| 10:31:03 |  | Hello, how are you? | こんにちは、お元気ですか？ |
-| 10:31:10 |  | I'm fine, thanks. | 元気です、ありがとう。 |
+| time | English | 日本語 |
+|------|---------|--------|
+| 10:31:03 | Hello, how are you? | こんにちは、お元気ですか？ |
+| 10:31:10 | I'm fine, thanks. | 元気です、ありがとう。 |
 ```
 
 ## Memory & performance (M-series Mac)
@@ -143,7 +141,6 @@ The opposite column shows the Qwen-translated version (or `…` while pending).
 On a 32 GB M4 MacBook Air with the recommended stack:
 - Whisper large-v3-turbo: transcribes faster than realtime on Metal
 - Qwen2.5-14B Q4_K_M: ~15–25 tok/s → a 20-word translation in ~2 s
-- Diarizer (sherpa-onnx ERes2Net): tens of ms per segment on CPU
 - Peak RSS: ~12 GB (plenty of headroom on 32 GB)
 
 For lighter setups: use `ggml-small.bin` + Qwen2.5-7B-Instruct-Q4_K_M.
@@ -153,8 +150,7 @@ For lighter setups: use `ggml-small.bin` + Qwen2.5-7B-Instruct-Q4_K_M.
 - [x] Phase 1: cpal → VAD → whisper.cpp → ratatui UI → Markdown export
 - [x] Phase 1.5: hallucination filters (silence fallbacks, YouTube tails, repetition loops)
 - [x] Phase 2: bilingual side-by-side (Qwen via llama.cpp)
-- [ ] Phase 3: speaker diarization (sherpa-onnx)
-- [ ] Phase 4: configurable shortcuts, device picker, live draft buffer
+- [ ] Phase 3: configurable shortcuts, device picker, live draft buffer
 
 ## Logs
 

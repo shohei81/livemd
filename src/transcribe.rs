@@ -24,7 +24,6 @@ pub struct TranscriptLine {
     pub src_lang: String,
     pub started_at: DateTime<Local>,
     pub ended_at: DateTime<Local>,
-    pub speaker: Option<String>,
 }
 
 pub struct TranscribeRunner {
@@ -53,7 +52,7 @@ impl TranscribeRunner {
         })
     }
 
-    pub fn run(&self, seg_rx: Receiver<std::sync::Arc<Segment>>, out_tx: Sender<TranscriptLine>) {
+    pub fn run(&self, seg_rx: Receiver<Segment>, out_tx: Sender<TranscriptLine>) {
         let mut state = match self.ctx.create_state() {
             Ok(s) => s,
             Err(e) => {
@@ -148,7 +147,6 @@ impl TranscribeRunner {
                 src_lang,
                 started_at: seg.started_at,
                 ended_at: seg.ended_at,
-                speaker: None,
             });
         }
     }

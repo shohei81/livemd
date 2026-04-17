@@ -1,4 +1,4 @@
-use crate::msg::{DiarizerStatus, TranslatorStatus};
+use crate::msg::TranslatorStatus;
 use crate::transcribe::TranscriptLine;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Gauge, List, ListItem, Paragraph};
@@ -12,7 +12,6 @@ pub struct UiState<'a> {
     pub model_name: &'a str,
     pub saved_note: Option<&'a str>,
     pub translator_status: TranslatorStatus,
-    pub diarizer_status: DiarizerStatus,
 }
 
 pub fn draw(f: &mut Frame, state: &UiState) {
@@ -32,15 +31,9 @@ pub fn draw(f: &mut Frame, state: &UiState) {
         TranslatorStatus::Ready => "tr=ready",
         TranslatorStatus::Failed => "tr=off",
     };
-    let di_label = match state.diarizer_status {
-        DiarizerStatus::Off => "di=off",
-        DiarizerStatus::Loading => "di=loading",
-        DiarizerStatus::Ready => "di=ready",
-        DiarizerStatus::Failed => "di=err",
-    };
     let title = format!(
-        " livemd · {} · lang={} · in={} · model={} · {} · {} ",
-        status_label, state.language, state.input_name, state.model_name, tr_label, di_label
+        " livemd · {} · lang={} · in={} · model={} · {} ",
+        status_label, state.language, state.input_name, state.model_name, tr_label
     );
     let gauge = Gauge::default()
         .block(Block::default().borders(Borders::ALL).title(title))
@@ -99,13 +92,6 @@ pub fn draw(f: &mut Frame, state: &UiState) {
 
 fn render_cell<'a>(line: &'a TranscriptLine, col_lang: &str) -> ListItem<'a> {
     let ts = line.started_at.format("%H:%M:%S").to_string();
-    let speaker = line
-        .speaker
-        .as_deref()
-        .filter(|s| !s.is_empty())
-        .map(|s| format!("{}: ", s))
-        .unwrap_or_default();
-
     let is_source = line.src_lang == col_lang;
     let (text, style) = if is_source {
         (line.text.as_str(), Style::default())
@@ -115,9 +101,8 @@ fn render_cell<'a>(line: &'a TranscriptLine, col_lang: &str) -> ListItem<'a> {
             None => ("…", Style::default().fg(Color::DarkGray)),
         }
     };
-
     let marker = if is_source { "▶ " } else { "  " };
-    let head = format!("[{}] {}{}", ts, marker, speaker);
+    let head = format!("[{}] {}", ts, marker);
 
     ListItem::new(Line::from(vec![
         Span::styled(head, Style::default().fg(Color::Cyan)),
