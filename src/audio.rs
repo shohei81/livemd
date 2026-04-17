@@ -7,6 +7,22 @@ use tracing::{info, warn};
 
 pub const TARGET_SR: u32 = 16_000;
 
+/// Returns the names of available input devices, with "default" prepended.
+pub fn list_input_devices() -> Vec<String> {
+    let mut out = vec!["default".to_string()];
+    let host = cpal::default_host();
+    if let Ok(devs) = host.input_devices() {
+        for d in devs {
+            if let Ok(name) = d.name() {
+                if !out.iter().any(|existing| existing == &name) {
+                    out.push(name);
+                }
+            }
+        }
+    }
+    out
+}
+
 pub struct AudioCapture {
     _stream: Stream,
     pub input_name: String,

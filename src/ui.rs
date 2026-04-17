@@ -1,7 +1,8 @@
+use crate::app::DevicePicker;
 use crate::msg::TranslatorStatus;
 use crate::transcribe::TranscriptLine;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Gauge, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph};
 
 pub struct UiState<'a> {
     pub lines: &'a [TranscriptLine],
@@ -12,6 +13,7 @@ pub struct UiState<'a> {
     pub model_name: &'a str,
     pub saved_note: Option<&'a str>,
     pub translator_status: TranslatorStatus,
+    pub picker: Option<&'a DevicePicker>,
 }
 
 pub fn draw(f: &mut Frame, state: &UiState) {
@@ -81,13 +83,61 @@ pub fn draw(f: &mut Frame, state: &UiState) {
 
     let help = match state.saved_note {
         Some(note) => format!(
-            " {} · q quit&save · s save · l lang · space pause ",
+            " {} · q quit&save · s save · l lang · d device · space pause ",
             note
         ),
-        None => " q quit&save · s save · l cycle lang · space pause ".to_string(),
+        None => " q quit&save · s save · l cycle lang · d device · space pause ".to_string(),
     };
     let help_p = Paragraph::new(help).style(Style::default().fg(Color::DarkGray));
     f.render_widget(help_p, chunks[2]);
+
+    if let Some(pk) = state.picker {
+        render_device_picker(f, pk);
+    }
+}
+
+fn render_device_picker(f: &mut Frame, pk: &DevicePicker) {
+    let area = centered_rect(60, 60, f.area());
+    f.render_widget(Clear, area);
+    let items: Vec<ListItem> = pk
+        .devices
+        .iter()
+        .enumerate()
+        .map(|(i, d)| {
+            let marker = if i == pk.selected { "▶ " } else { "  " };
+            let style = if i == pk.selected {
+                Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default()
+            };
+            ListItem::new(Span::styled(format!("{}{}", marker, d), style))
+        })
+        .collect();
+    let list = List::new(items).block(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Select input device  (↑↓ · enter · esc) "),
+    );
+    f.render_widget(list, area);
+}
+
+fn centered_rect(pct_x: u16, pct_y: u16, r: Rect) -> Rect {
+    let vertical = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - pct_y) / 2),
+            Constraint::Percentage(pct_y),
+            Constraint::Percentage((100 - pct_y) / 2),
+        ])
+        .split(r);
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - pct_x) / 2),
+            Constraint::Percentage(pct_x),
+            Constraint::Percentage((100 - pct_x) / 2),
+        ])
+        .split(vertical[1])[1]
 }
 
 fn render_cell<'a>(line: &'a TranscriptLine, col_lang: &str) -> ListItem<'a> {

@@ -22,6 +22,11 @@ use std::thread;
 use std::time::Duration;
 use tracing::info;
 
+pub struct DevicePicker {
+    pub devices: Vec<String>,
+    pub selected: usize,
+}
+
 pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
     let (audio_tx, audio_rx) = bounded::<Vec<f32>>(64);
     let (seg_tx, seg_rx) = bounded::<Segment>(16);
@@ -31,8 +36,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
 
     let language = Arc::new(RwLock::new(cfg.language.clone()));
 
-    let capture = AudioCapture::start(&cfg.input_device, audio_tx)?;
-    let input_name = capture.input_name.clone();
+    let mut capture = AudioCapture::start(&cfg.input_device, audio_tx.clone())?;
     let model_name = cfg
         .model_path
         .file_name()
@@ -130,7 +134,8 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         &cfg,
         &language,
         &paused,
-        &input_name,
+        &mut capture,
+        audio_tx,
         &model_name,
         ui_rx,
         level_rx,
@@ -147,7 +152,8 @@ fn run_loop(
     cfg: &Config,
     language: &Arc<RwLock<String>>,
     paused: &Arc<AtomicBool>,
-    input_name: &str,
+    capture: &mut AudioCapture,
+    audio_tx: crossbeam_channel::Sender<Vec<f32>>,
     model_name: &str,
     ui_rx: Receiver<UiMsg>,
     level_rx: Receiver<f32>,
@@ -159,6 +165,8 @@ fn run_loop(
     let mut level_smooth = 0.0f32;
     let mut saved_note: Option<String> = None;
     let mut translator_status = initial_translator_status;
+    let mut input_name = capture.input_name.clone();
+    let mut picker: Option<DevicePicker> = None;
 
     loop {
         while let Ok(msg) = ui_rx.try_recv() {
@@ -187,10 +195,11 @@ fn run_loop(
                     level: level_smooth,
                     language: &lang,
                     recording: is_recording,
-                    input_name,
+                    input_name: &input_name,
                     model_name,
                     saved_note: saved_note.as_deref(),
                     translator_status,
+                    picker: picker.as_ref(),
                 },
             );
         })?;
@@ -200,32 +209,73 @@ fn run_loop(
                 code, modifiers, ..
             }) = event::read()?
             {
-                match (code, modifiers) {
-                    (KeyCode::Char('q'), _)
-                    | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                        markdown::write(&cfg.output_path, &lines, existing_content)?;
-                        info!(path = %cfg.output_path.display(), "saved on quit");
-                        break;
-                    }
-                    (KeyCode::Char('s'), _) => {
-                        markdown::write(&cfg.output_path, &lines, existing_content)?;
-                        saved_note = Some(format!("saved → {}", cfg.output_path.display()));
-                    }
-                    (KeyCode::Char('l'), _) => {
-                        if let Ok(mut g) = language.write() {
-                            *g = match g.as_str() {
-                                "en" => "ja".into(),
-                                "ja" => "auto".into(),
-                                _ => "en".into(),
-                            };
+                if let Some(pk) = picker.as_mut() {
+                    match code {
+                        KeyCode::Esc | KeyCode::Char('d') | KeyCode::Char('q') => {
+                            picker = None;
                         }
+                        KeyCode::Up => {
+                            if pk.selected > 0 {
+                                pk.selected -= 1;
+                            }
+                        }
+                        KeyCode::Down => {
+                            if pk.selected + 1 < pk.devices.len() {
+                                pk.selected += 1;
+                            }
+                        }
+                        KeyCode::Enter => {
+                            let choice = pk.devices[pk.selected].clone();
+                            match AudioCapture::start(&choice, audio_tx.clone()) {
+                                Ok(new_cap) => {
+                                    input_name = new_cap.input_name.clone();
+                                    *capture = new_cap;
+                                    info!(device = %input_name, "switched input device");
+                                }
+                                Err(e) => {
+                                    tracing::error!(device = %choice, error = %e, "device switch failed");
+                                }
+                            }
+                            picker = None;
+                        }
+                        _ => {}
                     }
-                    (KeyCode::Char(' '), _) => {
-                        let now_paused = !paused.load(Ordering::Relaxed);
-                        paused.store(now_paused, Ordering::Relaxed);
-                        info!(paused = now_paused, "toggle recording");
+                } else {
+                    match (code, modifiers) {
+                        (KeyCode::Char('q'), _)
+                        | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
+                            markdown::write(&cfg.output_path, &lines, existing_content)?;
+                            info!(path = %cfg.output_path.display(), "saved on quit");
+                            break;
+                        }
+                        (KeyCode::Char('s'), _) => {
+                            markdown::write(&cfg.output_path, &lines, existing_content)?;
+                            saved_note = Some(format!("saved → {}", cfg.output_path.display()));
+                        }
+                        (KeyCode::Char('l'), _) => {
+                            if let Ok(mut g) = language.write() {
+                                *g = match g.as_str() {
+                                    "en" => "ja".into(),
+                                    "ja" => "auto".into(),
+                                    _ => "en".into(),
+                                };
+                            }
+                        }
+                        (KeyCode::Char(' '), _) => {
+                            let now_paused = !paused.load(Ordering::Relaxed);
+                            paused.store(now_paused, Ordering::Relaxed);
+                            info!(paused = now_paused, "toggle recording");
+                        }
+                        (KeyCode::Char('d'), _) => {
+                            let devices = crate::audio::list_input_devices();
+                            let selected = devices
+                                .iter()
+                                .position(|d| d == &input_name)
+                                .unwrap_or(0);
+                            picker = Some(DevicePicker { devices, selected });
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
