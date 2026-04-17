@@ -27,31 +27,46 @@ Pick the tier that matches your machine.
 - **high** shines on 32 GB Macs and produces noticeably better JA ↔ EN translation
   and ASR accuracy.
 
-## Install
+## Install / update
 
-One command does everything (binary install + model downloads + config):
+One command from anywhere — no clone needed:
 
 ```sh
-./setup.sh standard   # 16 GB Macs
+curl -fsSL https://raw.githubusercontent.com/shohei81/livemd/main/install.sh | bash -s -- high
 # or
-./setup.sh high       # 32 GB+ Macs
+curl -fsSL https://raw.githubusercontent.com/shohei81/livemd/main/install.sh | bash -s -- standard
 ```
 
-The script is idempotent — already-present models are skipped, so re-running
-is safe. It installs `livemd` into `~/.cargo/bin/`, drops models into
-`~/.config/livemd/models/`, and writes `~/.config/livemd/livemd.toml` from
-the matching example. To switch tiers later, just re-run with the other
-argument (models for the other tier will be added alongside; edit the
-config by hand if you want to free disk).
+The installer:
+- `cargo install --git … --force livemd` — builds from `main`, replaces the
+  existing binary.
+- Downloads tier-appropriate models into `~/.config/livemd/models/`
+  (skips anything already present).
+- Writes `~/.config/livemd/livemd.toml` from the tier example **only if
+  the file doesn't exist yet**. Pass `--reset-config` at the end to force
+  overwrite.
+
+### Update
+
+Run the exact same command. `cargo install --force` re-fetches `main`,
+rebuilds, and swaps the binary. Existing models and your edited config
+are preserved.
+
+### From a cloned repo (dev)
+
+```sh
+./install.sh high                  # same flow, cargo install --git
+# or, to build the currently checked-out code:
+./setup.sh high                    # cargo install --path .
+```
 
 ### Manual setup
 
 If you prefer to drive it yourself, `livemd.toml.standard.example` and
 `livemd.toml.high.example` list the exact model paths expected. Download
 the corresponding models into `~/.config/livemd/models/` and copy the
-example to `~/.config/livemd/livemd.toml`. Relative paths in the config
-resolve against the config file's directory, so `models/foo` means
-`~/.config/livemd/models/foo`.
+example to `~/.config/livemd/livemd.toml`. Relative paths resolve against
+the config file's directory, so `models/foo` → `~/.config/livemd/models/foo`.
 
 To disable translation, delete or comment out the `[translator]` section.
 The transcript-only path keeps working.
