@@ -1,0 +1,35 @@
+# Copy to livemd.toml and edit.
+
+# --- ASR (Whisper) ---
+# Path to a ggml whisper model (see README for download).
+model_path = "models/ggml-small.bin"
+
+# Where the final Markdown transcript is written.
+output_path = "transcript.md"
+
+# "en" | "ja" | "auto". Default is "en". Press `l` in TUI to cycle.
+# "auto" is prone to hallucinating non-target languages on short segments.
+language = "en"
+
+# "default" or a specific device name from `cpal` enumeration.
+input_device = "default"
+
+# Whisper decoding threads.
+threads = 4
+
+[vad]
+aggressiveness = 2
+min_speech_ms = 500
+silence_ms = 900
+max_segment_ms = 15000
+
+# --- Translator (optional, llama-server subprocess) ---
+# Install: `brew install llama.cpp` (provides `llama-server` on PATH)
+# Remove or comment out this section to disable translation.
+[translator]
+binary = "llama-server"
+model_path = "models/Qwen2.5-7B-Instruct-Q4_K_M.gguf"
+port = 8787
+n_ctx = 4096
+max_new_tokens = 512
+startup_timeout_secs = 120

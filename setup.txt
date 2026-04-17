@@ -1,0 +1,9 @@
+cargo install --path .
+
+mkdir -p ~/.config/livemd/models
+cp livemd.toml.example ~/.config/livemd/livemd.toml
+mv models/ggml-small.bin ~/.config/livemd/models/ 2>/dev/null
+mv models/Qwen2.5-7B-Instruct-Q4_K_M.gguf ~/.config/livemd/models/ 2>/dev/null
+
+livemd --version
+livemd notes.md
