@@ -1,25 +1,77 @@
 use crate::transcribe::TranscriptLine;
 use anyhow::Result;
-use chrono::Local;
+use chrono::{DateTime, Local};
 use std::io::Write;
 use std::path::Path;
 
-pub fn write(path: &Path, lines: &[TranscriptLine]) -> Result<()> {
+pub fn write(
+    path: &Path,
+    lines: &[TranscriptLine],
+    existing: Option<&str>,
+) -> Result<()> {
+    if lines.is_empty() && existing.is_none() {
+        return Ok(());
+    }
+
     let mut f = std::fs::File::create(path)?;
-    let started = lines
+
+    match existing {
+        Some(prev) => {
+            f.write_all(prev.as_bytes())?;
+            if !prev.ends_with('\n') {
+                writeln!(f)?;
+            }
+            writeln!(f)?;
+            if !lines.is_empty() {
+                write_session(&mut f, lines)?;
+            }
+        }
+        None => {
+            write_frontmatter(&mut f)?;
+            if !lines.is_empty() {
+                write_session(&mut f, lines)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn write_frontmatter(f: &mut std::fs::File) -> Result<()> {
+    let now = Local::now();
+    writeln!(f, "---")?;
+    writeln!(f, "title: Transcript")?;
+    writeln!(f, "created: {}", now.format("%Y-%m-%d %H:%M:%S"))?;
+    writeln!(f, "---")?;
+    writeln!(f)?;
+    Ok(())
+}
+
+fn write_session(f: &mut std::fs::File, lines: &[TranscriptLine]) -> Result<()> {
+    let started: DateTime<Local> = lines
         .first()
         .map(|l| l.started_at)
         .unwrap_or_else(Local::now);
-    let ended = lines
+    let ended: DateTime<Local> = lines
         .last()
         .map(|l| l.ended_at)
         .unwrap_or_else(Local::now);
 
-    writeln!(f, "---")?;
-    writeln!(f, "title: Transcript")?;
-    writeln!(f, "started: {}", started.format("%Y-%m-%d %H:%M:%S"))?;
-    writeln!(f, "ended: {}", ended.format("%Y-%m-%d %H:%M:%S"))?;
-    writeln!(f, "---")?;
+    let same_day = started.date_naive() == ended.date_naive();
+    if same_day {
+        writeln!(
+            f,
+            "## {} – {}",
+            started.format("%Y-%m-%d %H:%M"),
+            ended.format("%H:%M")
+        )?;
+    } else {
+        writeln!(
+            f,
+            "## {} – {}",
+            started.format("%Y-%m-%d %H:%M"),
+            ended.format("%Y-%m-%d %H:%M")
+        )?;
+    }
     writeln!(f)?;
     writeln!(f, "| time | speaker | English | 日本語 |")?;
     writeln!(f, "|------|---------|---------|--------|")?;

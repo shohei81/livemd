@@ -21,7 +21,7 @@ use std::thread;
 use std::time::Duration;
 use tracing::info;
 
-pub fn run(cfg: Config) -> Result<()> {
+pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
     let (audio_tx, audio_rx) = bounded::<Vec<f32>>(64);
     let (seg_tx, seg_rx) = bounded(16);
     let (line_tx, line_rx) = bounded::<TranscriptLine>(32);
@@ -133,6 +133,7 @@ pub fn run(cfg: Config) -> Result<()> {
         ui_rx,
         level_rx,
         translator_status_init,
+        existing_content.as_deref(),
     );
     restore_terminal(&mut terminal)?;
     drop(capture);
@@ -148,6 +149,7 @@ fn run_loop(
     ui_rx: Receiver<UiMsg>,
     level_rx: Receiver<f32>,
     initial_translator_status: TranslatorStatus,
+    existing_content: Option<&str>,
 ) -> Result<()> {
     let mut lines: Vec<TranscriptLine> = Vec::new();
     let mut level = 0.0f32;
@@ -198,12 +200,12 @@ fn run_loop(
                 match (code, modifiers) {
                     (KeyCode::Char('q'), _)
                     | (KeyCode::Char('c'), KeyModifiers::CONTROL) => {
-                        markdown::write(&cfg.output_path, &lines)?;
+                        markdown::write(&cfg.output_path, &lines, existing_content)?;
                         info!(path = %cfg.output_path.display(), "saved on quit");
                         break;
                     }
                     (KeyCode::Char('s'), _) => {
-                        markdown::write(&cfg.output_path, &lines)?;
+                        markdown::write(&cfg.output_path, &lines, existing_content)?;
                         saved_note = Some(format!("saved → {}", cfg.output_path.display()));
                     }
                     (KeyCode::Char('l'), _) => {

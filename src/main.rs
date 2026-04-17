@@ -31,6 +31,10 @@ struct Args {
     /// Override starting language (en | ja | auto)
     #[arg(short = 'l', long)]
     language: Option<String>,
+
+    /// Append a new session to an existing markdown file instead of overwriting.
+    #[arg(short = 'r', long)]
+    resume: bool,
 }
 
 fn main() -> Result<()> {
@@ -52,7 +56,19 @@ fn main() -> Result<()> {
     }
     cfg.log_dir = log_dir;
 
-    app::run(cfg)
+    let existing = if args.resume && cfg.output_path.exists() {
+        let content = std::fs::read_to_string(&cfg.output_path)?;
+        tracing::info!(
+            path = %cfg.output_path.display(),
+            bytes = content.len(),
+            "resuming: snapshot taken"
+        );
+        Some(content)
+    } else {
+        None
+    };
+
+    app::run(cfg, existing)
 }
 
 fn log_dir_path() -> PathBuf {

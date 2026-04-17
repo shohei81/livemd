@@ -79,12 +79,24 @@ livemd notes.md
 # or use the default output path from config
 livemd
 
+# append a new session to an existing file
+livemd --resume notes.md
+
 # override language at launch
 livemd meeting.md -l auto
 
 # explicit config file
 livemd notes.md -c ./project-specific.toml
 ```
+
+### Output modes
+
+- **Default (overwrite)**: writes `---` frontmatter + `## start – end` session
+  header + transcript table. Existing file is replaced.
+- **`--resume` / `-r`**: existing file content is preserved verbatim, a new
+  `## start – end` session block is appended below it. Multiple `s`
+  (save-now) presses during a session rewrite the same block, never
+  duplicate.
 
 ### Config search order
 
