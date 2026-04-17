@@ -16,6 +16,7 @@ use crossterm::terminal::{
 };
 use ratatui::prelude::*;
 use std::io::{self, Stdout};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Duration;
@@ -38,6 +39,8 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         .map(|s| s.to_string_lossy().into_owned())
         .unwrap_or_else(|| "unknown".into());
 
+    let paused = Arc::new(AtomicBool::new(false));
+    let paused_vad = paused.clone();
     let vad_cfg = cfg.vad.clone();
     thread::spawn(move || {
         let vad = VadRunner::new(
@@ -46,7 +49,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
             vad_cfg.silence_ms,
             vad_cfg.max_segment_ms,
         );
-        if let Err(e) = vad.run(audio_rx, seg_tx, level_tx) {
+        if let Err(e) = vad.run(audio_rx, seg_tx, level_tx, paused_vad) {
             tracing::error!("vad thread ended: {}", e);
         }
     });
@@ -126,6 +129,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         &mut terminal,
         &cfg,
         &language,
+        &paused,
         &input_name,
         &model_name,
         ui_rx,
@@ -142,6 +146,7 @@ fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<Stdout>>,
     cfg: &Config,
     language: &Arc<RwLock<String>>,
+    paused: &Arc<AtomicBool>,
     input_name: &str,
     model_name: &str,
     ui_rx: Receiver<UiMsg>,
@@ -152,7 +157,6 @@ fn run_loop(
     let mut lines: Vec<TranscriptLine> = Vec::new();
     let mut level = 0.0f32;
     let mut level_smooth = 0.0f32;
-    let mut recording = true;
     let mut saved_note: Option<String> = None;
     let mut translator_status = initial_translator_status;
 
@@ -174,6 +178,7 @@ fn run_loop(
         level_smooth = level_smooth * 0.7 + level * 0.3;
 
         let lang = language.read().map(|g| g.clone()).unwrap_or_default();
+        let is_recording = !paused.load(Ordering::Relaxed);
         terminal.draw(|f| {
             draw(
                 f,
@@ -181,7 +186,7 @@ fn run_loop(
                     lines: &lines,
                     level: level_smooth,
                     language: &lang,
-                    recording,
+                    recording: is_recording,
                     input_name,
                     model_name,
                     saved_note: saved_note.as_deref(),
@@ -216,7 +221,9 @@ fn run_loop(
                         }
                     }
                     (KeyCode::Char(' '), _) => {
-                        recording = !recording;
+                        let now_paused = !paused.load(Ordering::Relaxed);
+                        paused.store(now_paused, Ordering::Relaxed);
+                        info!(paused = now_paused, "toggle recording");
                     }
                     _ => {}
                 }

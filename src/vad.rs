@@ -3,6 +3,8 @@ use crate::transcribe::Segment;
 use anyhow::Result;
 use chrono::{DateTime, Local};
 use crossbeam_channel::{Receiver, Sender};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tracing::{debug, info};
 use webrtc_vad::{SampleRate as VadSr, Vad, VadMode};
 
@@ -31,6 +33,7 @@ impl VadRunner {
         audio_rx: Receiver<Vec<f32>>,
         seg_tx: Sender<Segment>,
         level_tx: Sender<f32>,
+        paused: Arc<AtomicBool>,
     ) -> Result<()> {
         let mode = match self.aggressiveness {
             0 => VadMode::Quality,
@@ -52,6 +55,17 @@ impl VadRunner {
         let mut next_id: u64 = 0;
 
         while let Ok(chunk) = audio_rx.recv() {
+            if paused.load(Ordering::Relaxed) {
+                // Discard audio, reset segment state, flatten the UI gauge.
+                leftover.clear();
+                segment.clear();
+                in_speech = false;
+                speech_frames = 0;
+                silence_frames = 0;
+                let _ = level_tx.try_send(0.0);
+                continue;
+            }
+
             leftover.extend_from_slice(&chunk);
 
             while leftover.len() >= FRAME_SAMPLES {
