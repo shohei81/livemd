@@ -17,9 +17,30 @@ pub struct Config {
     pub vad: VadConfig,
     #[serde(default)]
     pub translator: Option<TranslatorConfigToml>,
+    #[serde(default)]
+    pub diarizer: Option<DiarizerConfigToml>,
     /// Set at runtime by main.rs — not loaded from TOML.
     #[serde(default, skip)]
     pub log_dir: PathBuf,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct DiarizerConfigToml {
+    pub model_path: PathBuf,
+    #[serde(default = "default_diarizer_threshold")]
+    pub threshold: f32,
+    #[serde(default)]
+    pub num_threads: Option<usize>,
+    #[serde(default = "default_diarizer_min_samples")]
+    pub min_samples: usize,
+}
+
+fn default_diarizer_threshold() -> f32 {
+    0.5
+}
+fn default_diarizer_min_samples() -> usize {
+    // ~0.5 seconds at 16 kHz — embeddings below this are unreliable.
+    8_000
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -103,7 +124,14 @@ fn default_translator_startup_timeout() -> u64 {
 impl Config {
     pub fn load(explicit: Option<&Path>) -> Result<Self> {
         let path = find_config(explicit)?;
-        let config_dir = path
+        // Absolute-ify the config path so relative paths inside it resolve
+        // against the config's directory, not whatever CWD happens to be.
+        let abs_path = std::fs::canonicalize(&path).unwrap_or_else(|_| {
+            std::env::current_dir()
+                .map(|d| d.join(&path))
+                .unwrap_or_else(|_| path.clone())
+        });
+        let config_dir = abs_path
             .parent()
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| PathBuf::from("."));
@@ -120,6 +148,9 @@ impl Config {
             if t.binary.components().count() > 1 || t.binary.to_string_lossy().starts_with("~/") {
                 t.binary = resolve_path(&t.binary, &config_dir);
             }
+        }
+        if let Some(d) = cfg.diarizer.as_mut() {
+            d.model_path = resolve_path(&d.model_path, &config_dir);
         }
 
         tracing::info!(config = %path.display(), "config loaded");

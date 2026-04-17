@@ -2,8 +2,12 @@ cargo install --path .
 
 mkdir -p ~/.config/livemd/models
 cp livemd.toml.example ~/.config/livemd/livemd.toml
-mv models/ggml-small.bin ~/.config/livemd/models/ 2>/dev/null
-mv models/Qwen2.5-7B-Instruct-Q4_K_M.gguf ~/.config/livemd/models/ 2>/dev/null
+
+curl -L -o ~/.config/livemd/models/ggml-large-v3-turbo.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
+
+curl -L -o ~/.config/livemd/models/Qwen2.5-14B-Instruct-Q4_K_M.gguf https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf
+
+curl -L -o ~/.config/livemd/models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
 
 livemd --version
 livemd notes.md

@@ -5,10 +5,20 @@ pub enum UiMsg {
     NewLine(TranscriptLine),
     TranslationReady { id: u64, translated: String },
     TranslatorStatus(TranslatorStatus),
+    SpeakerReady { id: u64, speaker: String },
+    DiarizerStatus(DiarizerStatus),
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum TranslatorStatus {
+    Loading,
+    Ready,
+    Failed,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum DiarizerStatus {
+    Off,
     Loading,
     Ready,
     Failed,

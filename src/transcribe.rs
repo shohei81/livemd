@@ -9,6 +9,7 @@ use tracing::{debug, error, info};
 use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextParameters};
 
 pub struct Segment {
+    pub id: u64,
     pub samples: Vec<f32>,
     pub started_at: DateTime<Local>,
     pub ended_at: DateTime<Local>,
@@ -52,7 +53,7 @@ impl TranscribeRunner {
         })
     }
 
-    pub fn run(&self, seg_rx: Receiver<Segment>, out_tx: Sender<TranscriptLine>) {
+    pub fn run(&self, seg_rx: Receiver<std::sync::Arc<Segment>>, out_tx: Sender<TranscriptLine>) {
         let mut state = match self.ctx.create_state() {
             Ok(s) => s,
             Err(e) => {
@@ -62,7 +63,6 @@ impl TranscribeRunner {
         };
 
         let mut context_chars: Vec<char> = Vec::with_capacity(PROMPT_CHAR_WINDOW * 2);
-        let mut next_id: u64 = 0;
 
         while let Ok(seg) = seg_rx.recv() {
             let lang_snapshot = self
@@ -141,10 +141,8 @@ impl TranscribeRunner {
                 context_chars.drain(..drop);
             }
 
-            let id = next_id;
-            next_id += 1;
             let _ = out_tx.send(TranscriptLine {
-                id,
+                id: seg.id,
                 text: cleaned,
                 translated: None,
                 src_lang,

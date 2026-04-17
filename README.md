@@ -4,7 +4,8 @@ Live bilingual voice transcription TUI in Rust.
 
 - **ASR**: `cpal` → `webrtc-vad` → `whisper.cpp` (Metal) via `whisper-rs`
 - **Translation** (optional): Qwen2.5-7B-Instruct via `llama-server` subprocess (Metal), queried over HTTP
-- **UI**: `ratatui` two-column display (English ↔ 日本語)
+- **Diarization** (optional): `sherpa-onnx` speaker-embedding ONNX model via `sherpa-rs` (CPU), online centroid clustering
+- **UI**: `ratatui` two-column display (English ↔ 日本語) with `Sn:` speaker prefix
 - **Output**: timestamped Markdown table
 
 ## Requirements
@@ -18,11 +19,13 @@ Live bilingual voice transcription TUI in Rust.
 
 ```sh
 mkdir -p models
-curl -L -o models/ggml-small.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin
+curl -L -o models/ggml-large-v3-turbo.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin
 ```
 
-`small` (~500 MB) is the default; `base` is lighter, `medium` is more accurate.
+`large-v3-turbo` (~1.6 GB) is the recommended default — near-`large-v3`
+quality with `small`-like speed on M-series Metal. `small` (~500 MB) is a
+lighter fallback; `large-v3` (~3 GB) is the highest quality but slower.
 
 ### 2. llama-server + translator model (optional)
 
@@ -36,16 +39,34 @@ brew install llama.cpp   # provides `llama-server` on PATH
 Then download the Qwen model (bartowski's single-file build, no auth required):
 
 ```sh
-curl -L -o models/Qwen2.5-7B-Instruct-Q4_K_M.gguf \
-  https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf
+curl -L -o models/Qwen2.5-14B-Instruct-Q4_K_M.gguf \
+  https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf
 ```
 
-Size: ~4.7 GB. Peak RAM during inference: ~5 GB.
+Size: ~8.5 GB. Peak RAM during inference: ~9 GB. 14B noticeably outperforms
+7B on JA↔EN conversational translation on a 32 GB M-series machine. For
+lighter setups use `Qwen2.5-7B-Instruct-Q4_K_M.gguf` (~4.5 GB).
 
 `livemd` will spawn `llama-server --model ... --port 8787 --n-gpu-layers 999`
 on start and kill it on exit. Server logs go to `llama-server.log`.
 
 To run without translation, delete or comment out the `[translator]` section in `livemd.toml`.
+
+### 3. Diarizer model (optional)
+
+```sh
+curl -L -o models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx \
+  https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx
+```
+
+Size: ~40 MB. Embedding dim: 512. Language-agnostic (trained on zh but
+generalises well to JA/EN voices). Runs on CPU only but is very fast on
+M-series (~tens of ms per segment).
+
+Tune `threshold` in `[diarizer]` (0.45–0.55 typical for mixed JA/EN) if
+speakers are being merged or split.
+
+To run without diarization, delete or comment out the `[diarizer]` section.
 
 ## Install globally
 
@@ -152,12 +173,13 @@ The opposite column shows the Qwen-translated version (or `…` while pending).
 
 ## Memory & performance (M-series Mac)
 
-On a 32 GB M4 MacBook Air with Qwen 7B Q4_K_M:
-- Whisper small: transcribes in ~30% real-time (near-instant per segment)
-- Qwen2.5-7B: ~30–50 tok/s on Metal → a 20-word translation lands in ~1 s
-- Peak RSS: ~6 GB
+On a 32 GB M4 MacBook Air with the recommended stack:
+- Whisper large-v3-turbo: transcribes faster than realtime on Metal
+- Qwen2.5-14B Q4_K_M: ~15–25 tok/s → a 20-word translation in ~2 s
+- Diarizer (sherpa-onnx ERes2Net): tens of ms per segment on CPU
+- Peak RSS: ~12 GB (plenty of headroom on 32 GB)
 
-For higher quality, swap in Qwen2.5-14B Q4_K_M (~9 GB, ~20 tok/s).
+For lighter setups: use `ggml-small.bin` + Qwen2.5-7B-Instruct-Q4_K_M.
 
 ## Roadmap
 

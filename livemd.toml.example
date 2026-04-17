@@ -2,7 +2,7 @@
 
 # --- ASR (Whisper) ---
 # Path to a ggml whisper model (see README for download).
-model_path = "models/ggml-small.bin"
+model_path = "models/ggml-large-v3-turbo.bin"
 
 # Where the final Markdown transcript is written.
 output_path = "transcript.md"
@@ -28,8 +28,20 @@ max_segment_ms = 15000
 # Remove or comment out this section to disable translation.
 [translator]
 binary = "llama-server"
-model_path = "models/Qwen2.5-7B-Instruct-Q4_K_M.gguf"
+model_path = "models/Qwen2.5-14B-Instruct-Q4_K_M.gguf"
 port = 8787
 n_ctx = 4096
 max_new_tokens = 512
 startup_timeout_secs = 120
+
+# --- Diarizer (optional, sherpa-onnx speaker embeddings) ---
+# Download the ONNX model (see README). Remove this section to disable diarization.
+[diarizer]
+model_path = "models/3dspeaker_speech_eres2net_base_sv_zh-cn_3dspeaker_16k.onnx"
+# Cosine similarity threshold (0..1). Lower = more likely to reuse existing speaker.
+# Try 0.45–0.55 for mixed JA/EN audio.
+threshold = 0.5
+# CPU threads for embedding extraction. Leave unset for default.
+# num_threads = 2
+# Minimum PCM samples (16 kHz) to diarize a segment. ~8000 = 0.5 s.
+min_samples = 16000

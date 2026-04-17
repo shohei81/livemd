@@ -29,7 +29,7 @@ impl VadRunner {
     pub fn run(
         &self,
         audio_rx: Receiver<Vec<f32>>,
-        seg_tx: Sender<Segment>,
+        seg_tx: Sender<std::sync::Arc<Segment>>,
         level_tx: Sender<f32>,
     ) -> Result<()> {
         let mode = match self.aggressiveness {
@@ -49,6 +49,7 @@ impl VadRunner {
         let min_speech_frames = (self.min_speech_ms / FRAME_MS).max(1) as usize;
         let max_segment_frames = (self.max_segment_ms / FRAME_MS).max(1) as usize;
         let mut segment_start: Option<DateTime<Local>> = None;
+        let mut next_id: u64 = 0;
 
         while let Ok(chunk) = audio_rx.recv() {
             leftover.extend_from_slice(&chunk);
@@ -81,13 +82,17 @@ impl VadRunner {
                     if silence_frames >= silence_limit {
                         if speech_frames >= min_speech_frames {
                             let speech_ms = (speech_frames as u32) * FRAME_MS;
-                            let seg = Segment {
+                            let id = next_id;
+                            next_id += 1;
+                            let seg = std::sync::Arc::new(Segment {
+                                id,
                                 samples: std::mem::take(&mut segment),
                                 started_at: segment_start.unwrap_or_else(Local::now),
                                 ended_at: Local::now(),
                                 speech_ms,
-                            };
+                            });
                             info!(
+                                id,
                                 speech_frames,
                                 speech_ms,
                                 len = seg.samples.len(),
@@ -106,13 +111,16 @@ impl VadRunner {
 
                 if in_speech && (speech_frames + silence_frames) >= max_segment_frames {
                     let speech_ms = (speech_frames as u32) * FRAME_MS;
-                    let seg = Segment {
+                    let id = next_id;
+                    next_id += 1;
+                    let seg = std::sync::Arc::new(Segment {
+                        id,
                         samples: std::mem::take(&mut segment),
                         started_at: segment_start.unwrap_or_else(Local::now),
                         ended_at: Local::now(),
                         speech_ms,
-                    };
-                    info!("max segment reached, force-flushing");
+                    });
+                    info!(id, "max segment reached, force-flushing");
                     let _ = seg_tx.send(seg);
                     in_speech = false;
                     silence_frames = 0;

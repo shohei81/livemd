@@ -1,9 +1,10 @@
 use crate::{
     audio::AudioCapture,
     config::Config,
+    diarize::{self, DiarizerConfig},
     markdown,
     msg::{TranslatorStatus, UiMsg},
-    transcribe::{TranscribeRunner, TranscriptLine},
+    transcribe::{Segment, TranscribeRunner, TranscriptLine},
     translate::{self, TranslatorConfig},
     ui::{draw, UiState},
     vad::VadRunner,
@@ -23,7 +24,9 @@ use tracing::info;
 
 pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
     let (audio_tx, audio_rx) = bounded::<Vec<f32>>(64);
-    let (seg_tx, seg_rx) = bounded(16);
+    let (seg_tx, seg_rx) = bounded::<Arc<Segment>>(16);
+    let (trans_seg_tx, trans_seg_rx) = bounded::<Arc<Segment>>(16);
+    let (diar_seg_tx, diar_seg_rx) = bounded::<Arc<Segment>>(16);
     let (line_tx, line_rx) = bounded::<TranscriptLine>(32);
     let (ui_tx, ui_rx) = unbounded::<UiMsg>();
     let (level_tx, level_rx) = bounded::<f32>(16);
@@ -51,13 +54,39 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         }
     });
 
+    // Segment fanout: one consumer-side copy to Whisper, another to the
+    // diarizer (optional). Uses Arc<Segment> to avoid cloning PCM samples.
+    let diarizer_enabled = cfg.diarizer.is_some();
+    thread::spawn(move || {
+        while let Ok(seg) = seg_rx.recv() {
+            if diarizer_enabled {
+                let _ = diar_seg_tx.send(seg.clone());
+            }
+            let _ = trans_seg_tx.send(seg);
+        }
+    });
+
     let model_path = cfg.model_path.clone();
     let threads_n = cfg.threads;
     let lang_for_worker = language.clone();
     thread::spawn(move || match TranscribeRunner::new(&model_path, threads_n, lang_for_worker) {
-        Ok(runner) => runner.run(seg_rx, line_tx),
+        Ok(runner) => runner.run(trans_seg_rx, line_tx),
         Err(e) => tracing::error!("whisper init failed: {}", e),
     });
+
+    // Diarizer
+    if let Some(dcfg) = cfg.diarizer.clone() {
+        diarize::spawn(
+            DiarizerConfig {
+                model_path: dcfg.model_path,
+                threshold: dcfg.threshold,
+                num_threads: dcfg.num_threads,
+                min_samples: dcfg.min_samples,
+            },
+            diar_seg_rx,
+            ui_tx.clone(),
+        );
+    }
 
     // Decide translator configuration up-front.
     let translator_cfg = cfg
@@ -123,6 +152,12 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         }
     };
 
+    let diarizer_status_init = if diarizer_enabled {
+        crate::msg::DiarizerStatus::Loading
+    } else {
+        crate::msg::DiarizerStatus::Off
+    };
+
     let mut terminal = setup_terminal()?;
     let res = run_loop(
         &mut terminal,
@@ -133,6 +168,7 @@ pub fn run(cfg: Config, existing_content: Option<String>) -> Result<()> {
         ui_rx,
         level_rx,
         translator_status_init,
+        diarizer_status_init,
         existing_content.as_deref(),
     );
     restore_terminal(&mut terminal)?;
@@ -149,25 +185,42 @@ fn run_loop(
     ui_rx: Receiver<UiMsg>,
     level_rx: Receiver<f32>,
     initial_translator_status: TranslatorStatus,
+    initial_diarizer_status: crate::msg::DiarizerStatus,
     existing_content: Option<&str>,
 ) -> Result<()> {
+    use std::collections::HashMap;
     let mut lines: Vec<TranscriptLine> = Vec::new();
+    let mut pending_speakers: HashMap<u64, String> = HashMap::new();
     let mut level = 0.0f32;
     let mut level_smooth = 0.0f32;
     let mut recording = true;
     let mut saved_note: Option<String> = None;
     let mut translator_status = initial_translator_status;
+    let mut diarizer_status = initial_diarizer_status;
 
     loop {
         while let Ok(msg) = ui_rx.try_recv() {
             match msg {
-                UiMsg::NewLine(line) => lines.push(line),
+                UiMsg::NewLine(mut line) => {
+                    if let Some(sp) = pending_speakers.remove(&line.id) {
+                        line.speaker = Some(sp);
+                    }
+                    lines.push(line);
+                }
                 UiMsg::TranslationReady { id, translated } => {
                     if let Some(line) = lines.iter_mut().find(|l| l.id == id) {
                         line.translated = Some(translated);
                     }
                 }
                 UiMsg::TranslatorStatus(s) => translator_status = s,
+                UiMsg::SpeakerReady { id, speaker } => {
+                    if let Some(line) = lines.iter_mut().find(|l| l.id == id) {
+                        line.speaker = Some(speaker);
+                    } else {
+                        pending_speakers.insert(id, speaker);
+                    }
+                }
+                UiMsg::DiarizerStatus(s) => diarizer_status = s,
             }
         }
         while let Ok(l) = level_rx.try_recv() {
@@ -188,6 +241,7 @@ fn run_loop(
                     model_name,
                     saved_note: saved_note.as_deref(),
                     translator_status,
+                    diarizer_status,
                 },
             );
         })?;
