@@ -52,16 +52,31 @@ const SILENCE_FALLBACKS: &[&str] = &[
     "hmm",
 ];
 
-/// Suffixes whisper appends to otherwise-real speech. Stripped when present.
+/// YouTube-style suffixes whisper appends to otherwise-real speech. Stripped
+/// unconditionally when present at end. Compared case-insensitively.
 const TRAILING_HALLUCINATIONS: &[&str] = &[
-    "Thank you for watching.",
-    "Thanks for watching.",
-    "Thank you for watching!",
-    "Thanks for watching!",
-    "Thank you for watching",
-    "Thanks for watching",
-    "Please subscribe.",
-    "Please subscribe",
+    "thank you for watching.",
+    "thanks for watching.",
+    "thank you for watching!",
+    "thanks for watching!",
+    "thank you for watching",
+    "thanks for watching",
+    "please subscribe.",
+    "please subscribe",
+    "thanks for listening.",
+    "thanks for listening",
+];
+
+/// Filler that whisper tacks onto real sentences. Stripped only when the
+/// preceding content ends with sentence punctuation — avoids mangling real
+/// utterances like "I wanted to say thank you".
+const TRAILING_FILLER: &[&str] = &[
+    "thank you so much.",
+    "thank you very much.",
+    "thank you.",
+    "thank you",
+    "thanks.",
+    "thanks",
 ];
 
 pub fn clean(text: &str) -> Option<String> {
@@ -129,23 +144,63 @@ fn strip_trailing_hallucinations(s: &str) -> String {
     let mut out = s.trim().to_string();
     loop {
         let mut stripped = false;
+
+        // YouTube-style suffixes — strip unconditionally, case-insensitive.
         for phrase in TRAILING_HALLUCINATIONS {
-            if out.len() > phrase.len() && out.ends_with(phrase) {
-                out.truncate(out.len() - phrase.len());
-                out = out.trim_end().to_string();
-                // also trim trailing sentence-ending punct that was left orphan
-                while out.ends_with(' ') {
-                    out.pop();
-                }
+            if ends_with_ignore_ascii_case(&out, phrase) && out.len() > phrase.len() {
+                let new_len = out.len() - phrase.len();
+                out = out[..new_len].trim_end().to_string();
                 stripped = true;
                 break;
             }
         }
+        if stripped {
+            continue;
+        }
+
+        // Short filler (Thank you., Thanks.) — only strip if the text before
+        // already ends with a sentence boundary. Standalone "Thank you." is
+        // handled upstream by filter::is_silence_fallback.
+        for phrase in TRAILING_FILLER {
+            if ends_with_ignore_ascii_case(&out, phrase) && out.len() > phrase.len() {
+                let new_len = out.len() - phrase.len();
+                let before = out[..new_len].trim_end();
+                if is_sentence_end(before) {
+                    out = before.to_string();
+                    stripped = true;
+                    break;
+                }
+            }
+        }
+
         if !stripped {
             break;
         }
     }
     out
+}
+
+fn ends_with_ignore_ascii_case(s: &str, suffix: &str) -> bool {
+    if s.len() < suffix.len() {
+        return false;
+    }
+    let start = s.len() - suffix.len();
+    if !s.is_char_boundary(start) {
+        return false;
+    }
+    s[start..].eq_ignore_ascii_case(suffix)
+}
+
+fn is_sentence_end(s: &str) -> bool {
+    let t = s.trim_end();
+    t.ends_with('.')
+        || t.ends_with('?')
+        || t.ends_with('!')
+        || t.ends_with('…')
+        || t.ends_with("...")
+        || t.ends_with('。')
+        || t.ends_with('？')
+        || t.ends_with('！')
 }
 
 /// Whisper often appends a stray " you" or " you." after sentences. Strip it
@@ -332,9 +387,11 @@ mod tests {
 
     #[test]
     fn strips_trailing_youtube_tail() {
+        // Case now strips the dangling "Thank you." too since it follows a
+        // sentence boundary — hallucination tails are the overwhelming cause.
         assert_eq!(
             clean("I don't know. Thank you. Thank you for watching. you").as_deref(),
-            Some("I don't know. Thank you.")
+            Some("I don't know.")
         );
     }
 
@@ -369,6 +426,39 @@ mod tests {
         assert_eq!(
             clean("no no no, that's not what I meant").as_deref(),
             Some("no no no, that's not what I meant")
+        );
+    }
+
+    #[test]
+    fn strips_trailing_thank_you_after_sentence() {
+        assert_eq!(
+            clean("I can speak English. Thank you. Thank you.").as_deref(),
+            Some("I can speak English.")
+        );
+    }
+
+    #[test]
+    fn strips_trailing_thank_you_very_much() {
+        assert_eq!(
+            clean("That was a great talk. Thank you very much.").as_deref(),
+            Some("That was a great talk.")
+        );
+    }
+
+    #[test]
+    fn keeps_thank_you_in_middle() {
+        // Without sentence-ending punctuation before, the strip bails out.
+        assert_eq!(
+            clean("I wanted to say thank you").as_deref(),
+            Some("I wanted to say thank you")
+        );
+    }
+
+    #[test]
+    fn strips_case_insensitive_youtube_tail() {
+        assert_eq!(
+            clean("That concludes today's lecture. thank you for watching").as_deref(),
+            Some("That concludes today's lecture.")
         );
     }
 }

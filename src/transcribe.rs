@@ -88,6 +88,10 @@ impl TranscribeRunner {
             params.set_suppress_non_speech_tokens(true);
             params.set_temperature(0.0);
             params.set_temperature_inc(0.0);
+            // NOTE: whisper-rs 0.13 documents set_no_speech_thold as unimplemented
+            // (see its whisper_params.rs). Keep the call for when it lands; for
+            // now the silence-fallback filter in filter.rs + the speech_ms gate
+            // below do the real work.
             params.set_no_speech_thold(0.8);
             params.set_translate(false);
             if !prompt.is_empty() {
@@ -115,7 +119,7 @@ impl TranscribeRunner {
                 }
             };
 
-            if seg.speech_ms < 800 && filter::is_silence_fallback(&cleaned) {
+            if seg.speech_ms < 1500 && filter::is_silence_fallback(&cleaned) {
                 debug!(
                     speech_ms = seg.speech_ms,
                     text = %cleaned,
