@@ -9,9 +9,11 @@ mod translate;
 mod ui;
 mod vad;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use std::path::{Path, PathBuf};
+
+const ALLOWED_OUTPUT_EXTS: &[&str] = &["md", "markdown", "mdown", "mkd", "txt", "log"];
 
 #[derive(Parser, Debug)]
 #[command(version, about = "Live bilingual voice transcription TUI")]
@@ -50,7 +52,7 @@ fn main() -> Result<()> {
         cfg.model_path = m;
     }
     if let Some(o) = args.output {
-        cfg.output_path = o;
+        cfg.output_path = normalize_output_path(o)?;
     }
     if let Some(l) = args.language {
         cfg.language = l;
@@ -70,6 +72,27 @@ fn main() -> Result<()> {
     };
 
     app::run(cfg, existing)
+}
+
+fn normalize_output_path(path: PathBuf) -> Result<PathBuf> {
+    match path.extension() {
+        None => Ok(path.with_extension("md")),
+        Some(ext) => {
+            let lower = ext.to_string_lossy().to_ascii_lowercase();
+            if ALLOWED_OUTPUT_EXTS.iter().any(|e| *e == lower) {
+                Ok(path)
+            } else {
+                bail!(
+                    "unsupported output extension: .{lower} (allowed: {})",
+                    ALLOWED_OUTPUT_EXTS
+                        .iter()
+                        .map(|e| format!(".{e}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+            }
+        }
+    }
 }
 
 fn log_dir_path() -> PathBuf {
