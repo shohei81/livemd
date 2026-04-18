@@ -1,5 +1,5 @@
-# livemd — standard tier (16 GB M-series).
-# Copy to ~/.config/livemd/livemd.toml (the setup.sh script does this for you).
+# kotomark — standard tier (16 GB M-series).
+# Copy to ~/.config/kotomark/kotomark.toml (the setup.sh script does this for you).
 
 # --- ASR (Whisper small) ---
 model_path = "models/ggml-small.bin"

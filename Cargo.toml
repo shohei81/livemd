@@ -1,10 +1,14 @@
 [package]
-name = "livemd"
+name = "kotomark"
 version = "0.1.0"
 edition = "2021"
-description = "Live voice transcription TUI powered by whisper.cpp"
+description = "Live bilingual voice transcription TUI powered by whisper.cpp"
 license = "MIT"
-repository = "https://github.com/shohei81/livemd"
+repository = "https://github.com/shohei81/kotomark"
+
+[[bin]]
+name = "kmark"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"

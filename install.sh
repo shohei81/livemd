@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# livemd install / update — works both locally (cloned repo) and via curl | bash.
+# kotomark install / update — works both locally (cloned repo) and via curl | bash.
 # Rerun the same command to update; config is preserved unless --reset-config.
 set -euo pipefail
 
-REPO_URL="https://github.com/shohei81/livemd"
-RAW_URL="https://raw.githubusercontent.com/shohei81/livemd/main"
+REPO_URL="https://github.com/shohei81/kotomark"
+RAW_URL="https://raw.githubusercontent.com/shohei81/kotomark/main"
 
 TIER=""
 RESET_CONFIG=0
@@ -15,7 +15,7 @@ usage: install.sh {standard|high} [--reset-config]
 
   standard         Whisper small + Qwen2.5-7B   (~5 GB disk, ~7 GB RAM)
   high             Whisper large-v3-turbo + Qwen2.5-14B   (~10 GB disk, ~11 GB RAM)
-  --reset-config   Overwrite ~/.config/livemd/livemd.toml with the tier default
+  --reset-config   Overwrite ~/.config/kotomark/kotomark.toml with the tier default
 
 Remote install / update:
   curl -fsSL ${RAW_URL}/install.sh | bash -s -- high
@@ -45,12 +45,12 @@ if ! command -v llama-server >/dev/null 2>&1; then
     echo "      Install with: brew install llama.cpp"
 fi
 
-CONFIG_DIR="$HOME/.config/livemd"
+CONFIG_DIR="$HOME/.config/kotomark"
 MODEL_DIR="$CONFIG_DIR/models"
 mkdir -p "$MODEL_DIR"
 
-echo "==> Installing / updating livemd from ${REPO_URL}"
-cargo install --git "$REPO_URL" --force livemd
+echo "==> Installing / updating kotomark from ${REPO_URL}"
+cargo install --git "$REPO_URL" --force kotomark
 
 fetch() {
     local url="$1"
@@ -65,7 +65,7 @@ fetch() {
 
 write_config() {
     local example_name="$1"
-    local dest="$CONFIG_DIR/livemd.toml"
+    local dest="$CONFIG_DIR/kotomark.toml"
     if [[ -f "$dest" && $RESET_CONFIG -eq 0 ]]; then
         echo "  keep existing: $dest (pass --reset-config to overwrite)"
         return
@@ -81,7 +81,7 @@ if [[ "$TIER" == "standard" ]]; then
     fetch "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf" \
           "$MODEL_DIR/Qwen2.5-7B-Instruct-Q4_K_M.gguf"
     echo "==> Config"
-    write_config "livemd.toml.standard.example"
+    write_config "kotomark.toml.standard.example"
 else
     echo "==> Fetching high-tier models"
     fetch "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin" \
@@ -89,12 +89,12 @@ else
     fetch "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf" \
           "$MODEL_DIR/Qwen2.5-14B-Instruct-Q4_K_M.gguf"
     echo "==> Config"
-    write_config "livemd.toml.high.example"
+    write_config "kotomark.toml.high.example"
 fi
 
 echo ""
 echo "==> Done"
-echo "    Config: $CONFIG_DIR/livemd.toml"
+echo "    Config: $CONFIG_DIR/kotomark.toml"
 echo "    Models: $MODEL_DIR"
 echo ""
-echo "Run: livemd notes.md"
+echo "Run: kmark notes.md"

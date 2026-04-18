@@ -1,6 +1,6 @@
-# livemd
+# kotomark
 
-Live bilingual voice transcription TUI in Rust.
+Live bilingual voice transcription TUI in Rust. Binary: `kmark`.
 
 - **ASR**: `cpal` → `webrtc-vad` → `whisper.cpp` (Metal) via `whisper-rs`
 - **Translation** (optional): Qwen2.5 via `llama-server` subprocess (Metal), queried over HTTP
@@ -32,17 +32,17 @@ Pick the tier that matches your machine.
 One command from anywhere — no clone needed:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/shohei81/livemd/main/install.sh | bash -s -- high
+curl -fsSL https://raw.githubusercontent.com/shohei81/kotomark/main/install.sh | bash -s -- high
 # or
-curl -fsSL https://raw.githubusercontent.com/shohei81/livemd/main/install.sh | bash -s -- standard
+curl -fsSL https://raw.githubusercontent.com/shohei81/kotomark/main/install.sh | bash -s -- standard
 ```
 
 The installer:
-- `cargo install --git … --force livemd` — builds from `main`, replaces the
-  existing binary.
-- Downloads tier-appropriate models into `~/.config/livemd/models/`
+- `cargo install --git … --force kotomark` — builds from `main`, replaces the
+  existing binary (`kmark`).
+- Downloads tier-appropriate models into `~/.config/kotomark/models/`
   (skips anything already present).
-- Writes `~/.config/livemd/livemd.toml` from the tier example **only if
+- Writes `~/.config/kotomark/kotomark.toml` from the tier example **only if
   the file doesn't exist yet**. Pass `--reset-config` at the end to force
   overwrite.
 
@@ -62,11 +62,11 @@ are preserved.
 
 ### Manual setup
 
-If you prefer to drive it yourself, `livemd.toml.standard.example` and
-`livemd.toml.high.example` list the exact model paths expected. Download
-the corresponding models into `~/.config/livemd/models/` and copy the
-example to `~/.config/livemd/livemd.toml`. Relative paths resolve against
-the config file's directory, so `models/foo` → `~/.config/livemd/models/foo`.
+If you prefer to drive it yourself, `kotomark.toml.standard.example` and
+`kotomark.toml.high.example` list the exact model paths expected. Download
+the corresponding models into `~/.config/kotomark/models/` and copy the
+example to `~/.config/kotomark/kotomark.toml`. Relative paths resolve against
+the config file's directory, so `models/foo` → `~/.config/kotomark/models/foo`.
 
 To disable translation, delete or comment out the `[translator]` section.
 The transcript-only path keeps working.
@@ -75,19 +75,19 @@ The transcript-only path keeps working.
 
 ```sh
 # from anywhere
-livemd notes.md
+kmark notes.md
 
 # or use the default output path from config
-livemd
+kmark
 
 # append a new session to an existing file
-livemd --resume notes.md
+kmark --resume notes.md
 
 # override language at launch
-livemd meeting.md -l auto
+kmark meeting.md -l auto
 
 # explicit config file
-livemd notes.md -c ./project-specific.toml
+kmark notes.md -c ./project-specific.toml
 ```
 
 ### Output modes
@@ -102,19 +102,22 @@ livemd notes.md -c ./project-specific.toml
 ### Config search order
 
 1. `-c / --config` CLI flag (if given)
-2. `./livemd.toml` in the current directory
-3. `~/.config/livemd/livemd.toml`
+2. `./kotomark.toml` in the current directory
+3. `~/.config/kotomark/kotomark.toml`
+
+Legacy `livemd.toml` paths (from previous versions) are still picked up as a
+fallback if no `kotomark.toml` is present.
 
 ### Log location
 
-- App log: `~/.config/livemd/logs/livemd.log`
-- llama-server log: `~/.config/livemd/logs/llama-server.log`
-- Override: `LIVEMD_LOG_DIR=/some/path livemd notes.md`
+- App log: `~/.config/kotomark/logs/kmark.log`
+- llama-server log: `~/.config/kotomark/logs/llama-server.log`
+- Override: `KOTOMARK_LOG_DIR=/some/path kmark notes.md`
 
 ## Development
 
 ```sh
-cargo run --release          # uses ./livemd.toml
+cargo run --release          # uses ./kotomark.toml
 cargo run --release -- notes.md
 ```
 
@@ -130,7 +133,7 @@ cargo run --release -- notes.md
 ### UI
 
 ```
-┌ livemd · REC · lang=en · in=MacBook Pro Mic · model=ggml-small.bin · tr=ready ┐
+┌ kmark · REC · lang=en · in=MacBook Pro Mic · model=ggml-small.bin · tr=ready ┐
 │ ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                              │
 ├─ English ────────────────────────────┬─ 日本語 ──────────────────────────────┤
 │ [10:31:03] ▶ Hello, how are you?     │ [10:31:03]   こんにちは、お元気ですか？│
@@ -169,5 +172,5 @@ For lighter setups: use `ggml-small.bin` + Qwen2.5-7B-Instruct-Q4_K_M.
 
 ## Logs
 
-Diagnostic logs are written to `livemd.log` (keeps the TUI clean). Set
+Diagnostic logs are written to `kmark.log` (keeps the TUI clean). Set
 `RUST_LOG=debug` for verbose output.

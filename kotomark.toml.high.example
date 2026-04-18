@@ -1,4 +1,4 @@
-# Copy to livemd.toml and edit.
+# Copy to kotomark.toml and edit.
 
 # --- ASR (Whisper) ---
 # Path to a ggml whisper model (see README for download).

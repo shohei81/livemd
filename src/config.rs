@@ -142,24 +142,31 @@ fn find_config(explicit: Option<&Path>) -> Result<PathBuf> {
         return Ok(p.to_path_buf());
     }
 
-    let cwd_path = PathBuf::from("livemd.toml");
-    if cwd_path.exists() {
-        return Ok(cwd_path);
+    for candidate in ["kotomark.toml", "livemd.toml"] {
+        let p = PathBuf::from(candidate);
+        if p.exists() {
+            return Ok(p);
+        }
     }
 
     if let Some(home) = dirs::home_dir() {
-        let global = home.join(".config/livemd/livemd.toml");
-        if global.exists() {
-            return Ok(global);
+        for rel in [
+            ".config/kotomark/kotomark.toml",
+            ".config/livemd/livemd.toml",
+        ] {
+            let global = home.join(rel);
+            if global.exists() {
+                return Ok(global);
+            }
         }
     }
 
     Err(anyhow!(
-        "no livemd.toml found\n\
-         tried: ./livemd.toml, ~/.config/livemd/livemd.toml\n\
+        "no kotomark.toml found\n\
+         tried: ./kotomark.toml, ~/.config/kotomark/kotomark.toml\n\
          to set up globally:\n  \
-           mkdir -p ~/.config/livemd\n  \
-           cp livemd.toml.example ~/.config/livemd/livemd.toml\n  \
+           mkdir -p ~/.config/kotomark\n  \
+           cp kotomark.toml.example ~/.config/kotomark/kotomark.toml\n  \
            (then edit to point at your model files)"
     ))
 }

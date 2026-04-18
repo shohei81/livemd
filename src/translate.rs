@@ -87,7 +87,7 @@ impl ServerHandle {
             .spawn()
             .with_context(|| {
                 format!(
-                    "spawning llama-server ({}). Install it with `brew install llama.cpp` or set translator.binary in livemd.toml.",
+                    "spawning llama-server ({}). Install it with `brew install llama.cpp` or set translator.binary in kotomark.toml.",
                     cfg.binary.display()
                 )
             })?;
