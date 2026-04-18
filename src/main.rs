@@ -43,6 +43,7 @@ fn main() -> Result<()> {
     let log_dir = log_dir_path();
     std::fs::create_dir_all(&log_dir).ok();
     init_logging(&log_dir)?;
+    whisper_rs::install_whisper_tracing_trampoline();
 
     let mut cfg = config::Config::load(args.config.as_deref())?;
     if let Some(m) = args.model {

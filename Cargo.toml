@@ -23,7 +23,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ureq = { version = "2", features = ["json"] }
 webrtc-vad = "0.4"
-whisper-rs = { version = "0.13", features = ["metal"] }
+whisper-rs = { version = "0.13", features = ["metal", "whisper-cpp-tracing"] }
 
 [profile.release]
 lto = "thin"
