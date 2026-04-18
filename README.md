@@ -1,6 +1,6 @@
-# kotomark
+# kotoma
 
-Live bilingual voice transcription TUI in Rust. Binary: `kmark`.
+Live bilingual voice transcription TUI in Rust.
 
 - **ASR**: `cpal` → `webrtc-vad` → `whisper.cpp` (Metal) via `whisper-rs`
 - **Translation** (optional): Qwen2.5 via `llama-server` subprocess (Metal), queried over HTTP
@@ -32,17 +32,17 @@ Pick the tier that matches your machine.
 One command from anywhere — no clone needed:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/shohei81/kotomark/main/install.sh | bash -s -- high
+curl -fsSL https://raw.githubusercontent.com/shohei81/kotoma/main/install.sh | bash -s -- high
 # or
-curl -fsSL https://raw.githubusercontent.com/shohei81/kotomark/main/install.sh | bash -s -- standard
+curl -fsSL https://raw.githubusercontent.com/shohei81/kotoma/main/install.sh | bash -s -- standard
 ```
 
 The installer:
-- `cargo install --git … --force kotomark` — builds from `main`, replaces the
-  existing binary (`kmark`).
-- Downloads tier-appropriate models into `~/.config/kotomark/models/`
+- `cargo install --git … --force kotoma` — builds from `main`, replaces the
+  existing binary.
+- Downloads tier-appropriate models into `~/.config/kotoma/models/`
   (skips anything already present).
-- Writes `~/.config/kotomark/kotomark.toml` from the tier example **only if
+- Writes `~/.config/kotoma/kotoma.toml` from the tier example **only if
   the file doesn't exist yet**. Pass `--reset-config` at the end to force
   overwrite.
 
@@ -62,11 +62,11 @@ are preserved.
 
 ### Manual setup
 
-If you prefer to drive it yourself, `kotomark.toml.standard.example` and
-`kotomark.toml.high.example` list the exact model paths expected. Download
-the corresponding models into `~/.config/kotomark/models/` and copy the
-example to `~/.config/kotomark/kotomark.toml`. Relative paths resolve against
-the config file's directory, so `models/foo` → `~/.config/kotomark/models/foo`.
+If you prefer to drive it yourself, `kotoma.toml.standard.example` and
+`kotoma.toml.high.example` list the exact model paths expected. Download
+the corresponding models into `~/.config/kotoma/models/` and copy the
+example to `~/.config/kotoma/kotoma.toml`. Relative paths resolve against
+the config file's directory, so `models/foo` → `~/.config/kotoma/models/foo`.
 
 To disable translation, delete or comment out the `[translator]` section.
 The transcript-only path keeps working.
@@ -75,19 +75,19 @@ The transcript-only path keeps working.
 
 ```sh
 # from anywhere
-kmark notes.md
+kotoma notes.md
 
 # or use the default output path from config
-kmark
+kotoma
 
 # append a new session to an existing file
-kmark --resume notes.md
+kotoma --resume notes.md
 
 # override language at launch
-kmark meeting.md -l auto
+kotoma meeting.md -l auto
 
 # explicit config file
-kmark notes.md -c ./project-specific.toml
+kotoma notes.md -c ./project-specific.toml
 ```
 
 ### Output modes
@@ -102,22 +102,22 @@ kmark notes.md -c ./project-specific.toml
 ### Config search order
 
 1. `-c / --config` CLI flag (if given)
-2. `./kotomark.toml` in the current directory
-3. `~/.config/kotomark/kotomark.toml`
+2. `./kotoma.toml` in the current directory
+3. `~/.config/kotoma/kotoma.toml`
 
 Legacy `livemd.toml` paths (from previous versions) are still picked up as a
-fallback if no `kotomark.toml` is present.
+fallback if no `kotoma.toml` is present.
 
 ### Log location
 
-- App log: `~/.config/kotomark/logs/kmark.log`
-- llama-server log: `~/.config/kotomark/logs/llama-server.log`
-- Override: `KOTOMARK_LOG_DIR=/some/path kmark notes.md`
+- App log: `~/.config/kotoma/logs/kotoma.log`
+- llama-server log: `~/.config/kotoma/logs/llama-server.log`
+- Override: `KOTOMA_LOG_DIR=/some/path kotoma notes.md`
 
 ## Development
 
 ```sh
-cargo run --release          # uses ./kotomark.toml
+cargo run --release          # uses ./kotoma.toml
 cargo run --release -- notes.md
 ```
 
@@ -133,7 +133,7 @@ cargo run --release -- notes.md
 ### UI
 
 ```
-┌ kmark · REC · lang=en · in=MacBook Pro Mic · model=ggml-small.bin · tr=ready ┐
+┌ kotoma · REC · lang=en · in=MacBook Pro Mic · model=ggml-small.bin · tr=ready ┐
 │ ██████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░                              │
 ├─ English ────────────────────────────┬─ 日本語 ──────────────────────────────┤
 │ [10:31:03] ▶ Hello, how are you?     │ [10:31:03]   こんにちは、お元気ですか？│
@@ -172,5 +172,5 @@ For lighter setups: use `ggml-small.bin` + Qwen2.5-7B-Instruct-Q4_K_M.
 
 ## Logs
 
-Diagnostic logs are written to `kmark.log` (keeps the TUI clean). Set
+Diagnostic logs are written to `kotoma.log` (keeps the TUI clean). Set
 `RUST_LOG=debug` for verbose output.

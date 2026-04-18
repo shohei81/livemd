@@ -1,14 +1,10 @@
 [package]
-name = "kotomark"
+name = "kotoma"
 version = "0.1.0"
 edition = "2021"
 description = "Live bilingual voice transcription TUI powered by whisper.cpp"
 license = "MIT"
-repository = "https://github.com/shohei81/kotomark"
-
-[[bin]]
-name = "kmark"
-path = "src/main.rs"
+repository = "https://github.com/shohei81/kotoma"
 
 [dependencies]
 anyhow = "1"

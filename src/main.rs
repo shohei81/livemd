@@ -18,11 +18,11 @@ const ALLOWED_OUTPUT_EXTS: &[&str] = &["md", "markdown", "mdown", "mkd", "txt", 
 #[derive(Parser, Debug)]
 #[command(version, about = "Live bilingual voice transcription TUI")]
 struct Args {
-    /// Output markdown file. Example: `kmark notes.md`
+    /// Output markdown file. Example: `kotoma notes.md`
     #[arg(value_name = "OUTPUT.md")]
     output: Option<PathBuf>,
 
-    /// Path to config file (default: ./kotomark.toml or ~/.config/kotomark/kotomark.toml)
+    /// Path to config file (default: ./kotoma.toml or ~/.config/kotoma/kotoma.toml)
     #[arg(short = 'c', long)]
     config: Option<PathBuf>,
 
@@ -96,11 +96,11 @@ fn normalize_output_path(path: PathBuf) -> Result<PathBuf> {
 }
 
 fn log_dir_path() -> PathBuf {
-    if let Ok(v) = std::env::var("KOTOMARK_LOG_DIR").or_else(|_| std::env::var("LIVEMD_LOG_DIR")) {
+    if let Ok(v) = std::env::var("KOTOMA_LOG_DIR").or_else(|_| std::env::var("LIVEMD_LOG_DIR")) {
         return PathBuf::from(v);
     }
     if let Some(home) = dirs::home_dir() {
-        let new_dir = home.join(".config/kotomark/logs");
+        let new_dir = home.join(".config/kotoma/logs");
         let legacy = home.join(".config/livemd/logs");
         if !new_dir.exists() && legacy.exists() {
             return legacy;
@@ -114,9 +114,9 @@ fn init_logging(preferred: &Path) -> Result<()> {
     use tracing_subscriber::{fmt, EnvFilter};
 
     let log_path = if preferred.exists() {
-        preferred.join("kmark.log")
+        preferred.join("kotoma.log")
     } else {
-        PathBuf::from("kmark.log")
+        PathBuf::from("kotoma.log")
     };
     let file = std::fs::OpenOptions::new()
         .create(true)

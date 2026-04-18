@@ -36,7 +36,7 @@ pub fn draw(f: &mut Frame, state: &UiState) {
         TranslatorStatus::Failed => "tr=off",
     };
     let title = format!(
-        " kmark · {} · lang={} · in={} · model={} · {} ",
+        " kotoma · {} · lang={} · in={} · model={} · {} ",
         status_label, state.language, state.input_name, state.model_name, tr_label
     );
     let gauge = Gauge::default()

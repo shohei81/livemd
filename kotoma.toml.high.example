@@ -1,4 +1,4 @@
-# Copy to kotomark.toml and edit.
+# Copy to kotoma.toml and edit.
 
 # --- ASR (Whisper) ---
 # Path to a ggml whisper model (see README for download).

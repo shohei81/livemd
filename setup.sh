@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kotomark setup — installs the binary, downloads models, writes the global config.
+# kotoma setup — installs the binary, downloads models, writes the global config.
 # Usage: ./setup.sh {standard|high}
 set -euo pipefail
 
@@ -15,7 +15,7 @@ case "$TIER" in
         ;;
 esac
 
-CONFIG_DIR="$HOME/.config/kotomark"
+CONFIG_DIR="$HOME/.config/kotoma"
 MODEL_DIR="$CONFIG_DIR/models"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -32,7 +32,7 @@ fetch() {
     fi
 }
 
-echo "==> Installing kotomark binary"
+echo "==> Installing kotoma binary"
 (cd "$SCRIPT_DIR" && cargo install --path .)
 
 if [[ "$TIER" == "standard" ]]; then
@@ -46,7 +46,7 @@ if [[ "$TIER" == "standard" ]]; then
       "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf" \
       "$MODEL_DIR/Qwen2.5-7B-Instruct-Q4_K_M.gguf"
 
-    cp "$SCRIPT_DIR/kotomark.toml.standard.example" "$CONFIG_DIR/kotomark.toml"
+    cp "$SCRIPT_DIR/kotoma.toml.standard.example" "$CONFIG_DIR/kotoma.toml"
 else
     echo "==> Fetching Whisper large-v3-turbo (1.6 GB)"
     fetch \
@@ -58,11 +58,11 @@ else
       "https://huggingface.co/bartowski/Qwen2.5-14B-Instruct-GGUF/resolve/main/Qwen2.5-14B-Instruct-Q4_K_M.gguf" \
       "$MODEL_DIR/Qwen2.5-14B-Instruct-Q4_K_M.gguf"
 
-    cp "$SCRIPT_DIR/kotomark.toml.high.example" "$CONFIG_DIR/kotomark.toml"
+    cp "$SCRIPT_DIR/kotoma.toml.high.example" "$CONFIG_DIR/kotoma.toml"
 fi
 
 echo ""
-echo "==> Done. Config → $CONFIG_DIR/kotomark.toml"
+echo "==> Done. Config → $CONFIG_DIR/kotoma.toml"
 echo "    Models → $MODEL_DIR"
 echo ""
-echo "Try: kmark notes.md"
+echo "Try: kotoma notes.md"

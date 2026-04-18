@@ -142,7 +142,7 @@ fn find_config(explicit: Option<&Path>) -> Result<PathBuf> {
         return Ok(p.to_path_buf());
     }
 
-    for candidate in ["kotomark.toml", "livemd.toml"] {
+    for candidate in ["kotoma.toml", "livemd.toml"] {
         let p = PathBuf::from(candidate);
         if p.exists() {
             return Ok(p);
@@ -151,7 +151,7 @@ fn find_config(explicit: Option<&Path>) -> Result<PathBuf> {
 
     if let Some(home) = dirs::home_dir() {
         for rel in [
-            ".config/kotomark/kotomark.toml",
+            ".config/kotoma/kotoma.toml",
             ".config/livemd/livemd.toml",
         ] {
             let global = home.join(rel);
@@ -162,11 +162,11 @@ fn find_config(explicit: Option<&Path>) -> Result<PathBuf> {
     }
 
     Err(anyhow!(
-        "no kotomark.toml found\n\
-         tried: ./kotomark.toml, ~/.config/kotomark/kotomark.toml\n\
+        "no kotoma.toml found\n\
+         tried: ./kotoma.toml, ~/.config/kotoma/kotoma.toml\n\
          to set up globally:\n  \
-           mkdir -p ~/.config/kotomark\n  \
-           cp kotomark.toml.example ~/.config/kotomark/kotomark.toml\n  \
+           mkdir -p ~/.config/kotoma\n  \
+           cp kotoma.toml.example ~/.config/kotoma/kotoma.toml\n  \
            (then edit to point at your model files)"
     ))
 }
