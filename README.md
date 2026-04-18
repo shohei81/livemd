@@ -163,13 +163,6 @@ On a 32 GB M4 MacBook Air with the recommended stack:
 
 For lighter setups: use `ggml-small.bin` + Qwen2.5-7B-Instruct-Q4_K_M.
 
-## Roadmap
-
-- [x] Phase 1: cpal → VAD → whisper.cpp → ratatui UI → Markdown export
-- [x] Phase 1.5: hallucination filters (silence fallbacks, YouTube tails, repetition loops)
-- [x] Phase 2: bilingual side-by-side (Qwen via llama.cpp)
-- [ ] Phase 3: configurable shortcuts, device picker, live draft buffer
-
 ## Logs
 
 Diagnostic logs are written to `kotoma.log` (keeps the TUI clean). Set
