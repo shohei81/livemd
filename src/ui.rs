@@ -2,7 +2,7 @@ use crate::app::DevicePicker;
 use crate::msg::{DraftState, TranslatorStatus};
 use crate::transcribe::TranscriptLine;
 use ratatui::prelude::*;
-use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph};
+use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph, Wrap};
 
 pub struct UiState<'a> {
     pub lines: &'a [TranscriptLine],
@@ -71,34 +71,8 @@ pub fn draw(f: &mut Frame, state: &UiState) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[2]);
 
-    let height = cols[0].height.saturating_sub(2) as usize;
-    let start = state.lines.len().saturating_sub(height.max(1));
-
-    let en_items: Vec<ListItem> = state.lines[start..]
-        .iter()
-        .map(|l| render_cell(l, "en"))
-        .collect();
-    let ja_items: Vec<ListItem> = state.lines[start..]
-        .iter()
-        .map(|l| render_cell(l, "ja"))
-        .collect();
-
-    f.render_widget(
-        List::new(en_items).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" English "),
-        ),
-        cols[0],
-    );
-    f.render_widget(
-        List::new(ja_items).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" 日本語 "),
-        ),
-        cols[1],
-    );
+    render_transcript_column(f, cols[0], state.lines, "en", " English ");
+    render_transcript_column(f, cols[1], state.lines, "ja", " 日本語 ");
 
     let help = match state.saved_note {
         Some(note) => format!(
@@ -159,7 +133,25 @@ fn centered_rect(pct_x: u16, pct_y: u16, r: Rect) -> Rect {
         .split(vertical[1])[1]
 }
 
-fn render_cell<'a>(line: &'a TranscriptLine, col_lang: &str) -> ListItem<'a> {
+fn render_transcript_column(
+    f: &mut Frame,
+    area: Rect,
+    lines: &[TranscriptLine],
+    col_lang: &str,
+    title: &str,
+) {
+    let block = Block::default().borders(Borders::ALL).title(title.to_string());
+    let inner = block.inner(area);
+    let wrapped: Vec<Line> = lines.iter().map(|l| render_line(l, col_lang)).collect();
+
+    let para = Paragraph::new(wrapped).wrap(Wrap { trim: false });
+    let total = para.line_count(inner.width) as u16;
+    let scroll = total.saturating_sub(inner.height);
+    let para = para.scroll((scroll, 0)).block(block);
+    f.render_widget(para, area);
+}
+
+fn render_line<'a>(line: &'a TranscriptLine, col_lang: &str) -> Line<'a> {
     let ts = line.started_at.format("%H:%M:%S").to_string();
     let is_source = line.src_lang == col_lang;
     let (text, style) = if is_source {
@@ -173,8 +165,8 @@ fn render_cell<'a>(line: &'a TranscriptLine, col_lang: &str) -> ListItem<'a> {
     let marker = if is_source { "▶ " } else { "  " };
     let head = format!("[{}] {}", ts, marker);
 
-    ListItem::new(Line::from(vec![
+    Line::from(vec![
         Span::styled(head, Style::default().fg(Color::Cyan)),
         Span::styled(text.to_string(), style),
-    ]))
+    ])
 }
