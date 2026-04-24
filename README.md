@@ -129,6 +129,11 @@ cargo run --release -- notes.md
 | `s`           | Save transcript now             |
 | `l`           | Cycle Whisper language (en → ja → auto) |
 | `space`       | Pause / resume UI               |
+| `d`           | Switch input device             |
+| `↑` / `↓`     | Scroll transcript up / down one line |
+| `PgUp` / `PgDn` | Scroll by half a page          |
+| `Home` / `End` | Jump to oldest line / resume live tail |
+| mouse wheel   | Scroll transcript               |
 
 ### UI
 

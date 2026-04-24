@@ -87,7 +87,11 @@ impl TranscribeRunner {
             params.set_suppress_blank(true);
             params.set_suppress_non_speech_tokens(true);
             params.set_temperature(0.0);
-            params.set_temperature_inc(0.0);
+            // Keep temperature_inc at the upstream default (0.2). When
+            // entropy_thold / logprob_thold flags a degenerate segment,
+            // whisper retries with temperature bumped up — this is the
+            // built-in escape hatch from repetition loops. Setting this
+            // to 0.0 disables the fallback entirely.
             // NOTE: whisper-rs 0.13 documents set_no_speech_thold as unimplemented
             // (see its whisper_params.rs). Keep the call for when it lands; for
             // now the silence-fallback filter in filter.rs + the speech_ms gate

@@ -3,6 +3,7 @@ use crate::msg::{DraftState, TranslatorStatus};
 use crate::transcribe::TranscriptLine;
 use ratatui::prelude::*;
 use ratatui::widgets::{Block, Borders, Clear, Gauge, List, ListItem, Paragraph, Wrap};
+use std::cell::Cell;
 
 pub struct UiState<'a> {
     pub lines: &'a [TranscriptLine],
@@ -15,6 +16,11 @@ pub struct UiState<'a> {
     pub translator_status: TranslatorStatus,
     pub picker: Option<&'a DevicePicker>,
     pub draft: DraftState,
+    /// Rows scrolled up from the tail. 0 = follow latest.
+    pub scroll_up: u16,
+    /// Out-param: set during draw to the largest usable `scroll_up` across
+    /// both transcript columns, so the caller can clamp user input.
+    pub scroll_max: &'a Cell<u16>,
 }
 
 pub fn draw(f: &mut Frame, state: &UiState) {
@@ -71,15 +77,40 @@ pub fn draw(f: &mut Frame, state: &UiState) {
         .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
         .split(chunks[2]);
 
-    render_transcript_column(f, cols[0], state.lines, "en", " English ");
-    render_transcript_column(f, cols[1], state.lines, "ja", " 日本語 ");
+    state.scroll_max.set(0);
+    render_transcript_column(
+        f,
+        cols[0],
+        state.lines,
+        "en",
+        " English ",
+        state.scroll_up,
+        state.scroll_max,
+    );
+    render_transcript_column(
+        f,
+        cols[1],
+        state.lines,
+        "ja",
+        " 日本語 ",
+        state.scroll_up,
+        state.scroll_max,
+    );
 
+    let nav = if state.scroll_up == 0 {
+        " ↑/PgUp scroll ".to_string()
+    } else {
+        format!(" ↑↓/PgUp/PgDn · End follow (−{}) ", state.scroll_up)
+    };
     let help = match state.saved_note {
         Some(note) => format!(
-            " {} · q quit&save · s save · l lang · d device · space pause ",
-            note
+            " {} · q quit&save · s save · l lang · d device · space pause ·{}",
+            note, nav
         ),
-        None => " q quit&save · s save · l cycle lang · d device · space pause ".to_string(),
+        None => format!(
+            " q quit&save · s save · l cycle lang · d device · space pause ·{}",
+            nav
+        ),
     };
     let help_p = Paragraph::new(help).style(Style::default().fg(Color::DarkGray));
     f.render_widget(help_p, chunks[3]);
@@ -139,6 +170,8 @@ fn render_transcript_column(
     lines: &[TranscriptLine],
     col_lang: &str,
     title: &str,
+    scroll_up: u16,
+    scroll_max: &Cell<u16>,
 ) {
     let block = Block::default().borders(Borders::ALL).title(title.to_string());
     let inner = block.inner(area);
@@ -146,7 +179,12 @@ fn render_transcript_column(
 
     let para = Paragraph::new(wrapped).wrap(Wrap { trim: false });
     let total = para.line_count(inner.width) as u16;
-    let scroll = total.saturating_sub(inner.height);
+    let tail = total.saturating_sub(inner.height);
+    let col_max = tail;
+    if col_max > scroll_max.get() {
+        scroll_max.set(col_max);
+    }
+    let scroll = tail.saturating_sub(scroll_up.min(col_max));
     let para = para.scroll((scroll, 0)).block(block);
     f.render_widget(para, area);
 }

@@ -10,11 +10,15 @@ use crate::{
 };
 use anyhow::Result;
 use crossbeam_channel::{bounded, unbounded, Receiver};
-use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+    MouseEvent, MouseEventKind,
+};
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use ratatui::prelude::*;
+use std::cell::Cell;
 use std::io::{self, Stdout};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, RwLock};
@@ -171,6 +175,8 @@ fn run_loop(
     let mut input_name = capture.input_name.clone();
     let mut picker: Option<DevicePicker> = None;
     let mut draft = DraftState::default();
+    let mut scroll_up: u16 = 0;
+    let scroll_max_cell: Cell<u16> = Cell::new(0);
 
     loop {
         while let Ok(msg) = ui_rx.try_recv() {
@@ -208,14 +214,30 @@ fn run_loop(
                     translator_status,
                     picker: picker.as_ref(),
                     draft,
+                    scroll_up,
+                    scroll_max: &scroll_max_cell,
                 },
             );
         })?;
+        // Clamp any key-driven over-scroll to what the columns can actually show.
+        scroll_up = scroll_up.min(scroll_max_cell.get());
+        let page = terminal.size().map(|r| r.height / 2).unwrap_or(5).max(1);
 
         if event::poll(Duration::from_millis(50))? {
-            if let Event::Key(KeyEvent {
+            let ev = event::read()?;
+            if let Event::Mouse(MouseEvent { kind, .. }) = ev {
+                match kind {
+                    MouseEventKind::ScrollUp => {
+                        scroll_up = scroll_up.saturating_add(3).min(scroll_max_cell.get());
+                    }
+                    MouseEventKind::ScrollDown => {
+                        scroll_up = scroll_up.saturating_sub(3);
+                    }
+                    _ => {}
+                }
+            } else if let Event::Key(KeyEvent {
                 code, modifiers, ..
-            }) = event::read()?
+            }) = ev
             {
                 if let Some(pk) = picker.as_mut() {
                     match code {
@@ -282,6 +304,24 @@ fn run_loop(
                                 .unwrap_or(0);
                             picker = Some(DevicePicker { devices, selected });
                         }
+                        (KeyCode::Up, _) => {
+                            scroll_up = scroll_up.saturating_add(1).min(scroll_max_cell.get());
+                        }
+                        (KeyCode::Down, _) => {
+                            scroll_up = scroll_up.saturating_sub(1);
+                        }
+                        (KeyCode::PageUp, _) => {
+                            scroll_up = scroll_up.saturating_add(page).min(scroll_max_cell.get());
+                        }
+                        (KeyCode::PageDown, _) => {
+                            scroll_up = scroll_up.saturating_sub(page);
+                        }
+                        (KeyCode::Home, _) => {
+                            scroll_up = scroll_max_cell.get();
+                        }
+                        (KeyCode::End, _) => {
+                            scroll_up = 0;
+                        }
                         _ => {}
                     }
                 }
@@ -294,14 +334,18 @@ fn run_loop(
 fn setup_terminal() -> Result<Terminal<CrosstermBackend<Stdout>>> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    crossterm::execute!(stdout, EnterAlternateScreen)?;
+    crossterm::execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     Ok(Terminal::new(backend)?)
 }
 
 fn restore_terminal(terminal: &mut Terminal<CrosstermBackend<Stdout>>) -> Result<()> {
     disable_raw_mode()?;
-    crossterm::execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    crossterm::execute!(
+        terminal.backend_mut(),
+        DisableMouseCapture,
+        LeaveAlternateScreen
+    )?;
     terminal.show_cursor()?;
     Ok(())
 }
