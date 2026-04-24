@@ -129,7 +129,7 @@ cargo run --release -- notes.md
 | `s`           | Save transcript now             |
 | `l`           | Cycle Whisper language (en → ja → auto) |
 | `space`       | Pause / resume UI               |
-| `d`           | Switch input device             |
+| `d`           | Switch audio source (mic or system-audio loopback) |
 | `↑` / `↓`     | Scroll transcript up / down one line |
 | `PgUp` / `PgDn` | Scroll by half a page          |
 | `Home` / `End` | Jump to oldest line / resume live tail |
@@ -149,6 +149,25 @@ cargo run --release -- notes.md
 
 `▶` marks the source-language side (the one the speaker actually used).
 The opposite column shows the Qwen-translated version (or `…` while pending).
+
+### Audio sources
+
+Press `d` to pick from available audio sources. The picker lists:
+
+- **Input devices** — microphones and line-in.
+- **`[loopback] …` entries** — output devices captured as system audio
+  (meetings, browser audio, music, etc.).
+
+Platform support for loopback:
+
+- **Windows** — natively supported via WASAPI. Pick `[loopback] Speakers`
+  (or similar) and system audio is captured directly.
+- **macOS** — cpal has no native loopback. Install a virtual audio driver
+  such as [BlackHole](https://github.com/ExistentialAudio/BlackHole), route
+  system audio through it (a Multi-Output Device lets you hear and capture
+  simultaneously), and select BlackHole from the regular input list.
+- **Linux (PulseAudio/PipeWire)** — pick the sink's `*.monitor` entry from
+  the input list.
 
 ### Markdown output
 

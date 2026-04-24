@@ -7,7 +7,17 @@ use tracing::{info, warn};
 
 pub const TARGET_SR: u32 = 16_000;
 
-/// Returns the names of available input devices, with "default" prepended.
+/// Prefix used on loopback (system-audio) sources so we can distinguish them
+/// from real input devices that happen to share the same name.
+pub const LOOPBACK_PREFIX: &str = "loopback:";
+
+/// Returns selectable audio sources: "default" + input devices + output
+/// devices prefixed with [`LOOPBACK_PREFIX`] for system-audio capture.
+///
+/// On Windows, output devices can be opened as input via WASAPI loopback.
+/// On macOS/Linux, loopback entries are enumerated too, but opening them
+/// will fail unless a virtual driver (e.g. BlackHole) is in use — in that
+/// case the virtual driver already appears as a regular input device.
 pub fn list_input_devices() -> Vec<String> {
     let mut out = vec!["default".to_string()];
     let host = cpal::default_host();
@@ -16,6 +26,16 @@ pub fn list_input_devices() -> Vec<String> {
             if let Ok(name) = d.name() {
                 if !out.iter().any(|existing| existing == &name) {
                     out.push(name);
+                }
+            }
+        }
+    }
+    if let Ok(devs) = host.output_devices() {
+        for d in devs {
+            if let Ok(name) = d.name() {
+                let labeled = format!("{}{}", LOOPBACK_PREFIX, name);
+                if !out.iter().any(|existing| existing == &labeled) {
+                    out.push(labeled);
                 }
             }
         }
@@ -35,19 +55,52 @@ pub struct AudioCapture {
 impl AudioCapture {
     pub fn start(device_name: &str, tx: Sender<Vec<f32>>) -> Result<Self> {
         let host = cpal::default_host();
-        let device = if device_name == "default" {
-            host.default_input_device()
-                .ok_or_else(|| anyhow!("no default input device"))?
+        let (device, is_loopback) = if let Some(name) = device_name.strip_prefix(LOOPBACK_PREFIX) {
+            let dev = host
+                .output_devices()?
+                .find(|d| d.name().map(|n| n == name).unwrap_or(false))
+                .ok_or_else(|| anyhow!("output device not found: {}", name))?;
+            if !cfg!(target_os = "windows") {
+                warn!(
+                    device = %name,
+                    "loopback capture is only natively supported on Windows \
+                     (WASAPI). On macOS, install a virtual audio driver \
+                     (e.g. BlackHole) and select it as a regular input device. \
+                     On Linux (PulseAudio), select the *.monitor source from \
+                     the input list."
+                );
+            }
+            (dev, true)
+        } else if device_name == "default" {
+            (
+                host.default_input_device()
+                    .ok_or_else(|| anyhow!("no default input device"))?,
+                false,
+            )
         } else {
-            host.input_devices()?
+            let dev = host
+                .input_devices()?
                 .find(|d| d.name().map(|n| n == device_name).unwrap_or(false))
-                .ok_or_else(|| anyhow!("input device not found: {}", device_name))?
+                .ok_or_else(|| anyhow!("input device not found: {}", device_name))?;
+            (dev, false)
         };
 
-        let input_name = device.name().unwrap_or_else(|_| "unknown".into());
-        let supported = device
-            .default_input_config()
-            .context("default input config")?;
+        let input_name = if is_loopback {
+            format!("{}{}", LOOPBACK_PREFIX, device.name().unwrap_or_else(|_| "unknown".into()))
+        } else {
+            device.name().unwrap_or_else(|_| "unknown".into())
+        };
+        // On WASAPI loopback we capture the output format; on real input
+        // devices we use the input config.
+        let supported = if is_loopback {
+            device
+                .default_output_config()
+                .context("default output config (loopback)")?
+        } else {
+            device
+                .default_input_config()
+                .context("default input config")?
+        };
         let sample_format = supported.sample_format();
         let config: StreamConfig = supported.into();
         let input_sr = config.sample_rate.0;
@@ -58,6 +111,7 @@ impl AudioCapture {
             input_sr,
             input_channels,
             ?sample_format,
+            is_loopback,
             "opening input stream"
         );
 

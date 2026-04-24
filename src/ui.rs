@@ -129,18 +129,22 @@ fn render_device_picker(f: &mut Frame, pk: &DevicePicker) {
         .enumerate()
         .map(|(i, d)| {
             let marker = if i == pk.selected { "▶ " } else { "  " };
+            let label = match d.strip_prefix(crate::audio::LOOPBACK_PREFIX) {
+                Some(name) => format!("[loopback] {}", name),
+                None => d.clone(),
+            };
             let style = if i == pk.selected {
                 Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)
             } else {
                 Style::default()
             };
-            ListItem::new(Span::styled(format!("{}{}", marker, d), style))
+            ListItem::new(Span::styled(format!("{}{}", marker, label), style))
         })
         .collect();
     let list = List::new(items).block(
         Block::default()
             .borders(Borders::ALL)
-            .title(" Select input device  (↑↓ · enter · esc) "),
+            .title(" Select audio source  (↑↓ · enter · esc) "),
     );
     f.render_widget(list, area);
 }
