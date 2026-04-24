@@ -186,10 +186,16 @@ fn translate_once(
     };
 
     let ctx_block = context.render();
+    let lang_guard = if line.src_lang == "ja" {
+        "- The output MUST be written in English only. Never output Japanese, Chinese, or any other language."
+    } else {
+        "- The output MUST be written in Japanese only. Never output Simplified or Traditional Chinese. Use hiragana, katakana, and Japanese-style kanji; do NOT output Chinese-only characters or Pinyin."
+    };
     let system = format!(
         "You are a professional simultaneous interpreter translating from {src} to {dst}.\n\
 Rules:\n\
 - Output ONLY the translation. No explanations, no quotes, no prefixes.\n\
+{lang_guard}\n\
 - If the input is a sentence fragment (no period, cut mid-thought), translate it as a fragment. Do NOT pad or complete.\n\
 - Preserve tone: formal stays formal, casual stays casual.\n\
 - Keep proper nouns, technical terms, and numbers exact.\n\
@@ -206,6 +212,7 @@ Rules:\n\
         "n_predict": cfg.max_new_tokens,
         "temperature": 0.2,
         "top_p": 0.9,
+        "min_p": 0.01,
         "repeat_penalty": 1.1,
         "stop": ["<|im_end|>", "<|endoftext|>"],
         "cache_prompt": true
